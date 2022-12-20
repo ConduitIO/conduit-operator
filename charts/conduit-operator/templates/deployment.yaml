@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: '{{ include "conduit-operator.fullname" . }}'
+  namespace: '{{ .Release.Namespace }}'
+  labels:
+    {{- include "conduit-operator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "conduit-operator.selectorLabels" . | nindent 8 }}
+  template:
+    metadata:
+      annotations:
+        # TODO: this is temporarily fix to always rool during redeploy
+        rollme: {{ randAlphaNum 5 | quote }}
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "conduit-operator.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: controller
+        command:
+        - /app/conduit-operator
+        args:
+        - -zap-devel={{ .Values.controller.useDevLogger }}
+        - -instance-metadata
+        - {{ include "conduit-operator.conduitMetadataFile" . }}
+        {{- if or .Values.controller.leaderElect .Values.autoscaling.enabled (gt (int .Values.replicaCount) 1) }}
+        - -leader-elect
+        {{- end }}
+        image: '{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion
+          }}'
+        imagePullPolicy: '{{ .Values.image.pullPolicy }}'
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 16
+          periodSeconds: 20
+        ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+        - mountPath: {{ .Values.controller.conduitInstance.metadataDir }}
+          name: '{{ include "conduit-operator.fullname" . }}-instance-config'
+          readOnly: true
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: '{{ include "conduit-operator.serviceAccountName" . }}'
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
+      - name: '{{ include "conduit-operator.fullname" . }}-instance-config'
+        configMap:
+           name: '{{ include "conduit-operator.fullname" . }}-instance-config'

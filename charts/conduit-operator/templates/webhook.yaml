@@ -1,0 +1,57 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: '{{ .Release.Namespace }}/{{ include "conduit-operator.fullname"
+      . }}-serving-cert'
+  name: '{{ include "conduit-operator.fullname" . }}-mutating-webhook-configuration'
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: '{{ include "conduit-operator.fullname" . }}-webhook'
+      namespace: '{{ .Release.Namespace }}'
+      path: /mutate-operator-conduit-io-v1-conduit
+  failurePolicy: Fail
+  name: mconduit.kb.io
+  rules:
+  - apiGroups:
+    - operator.conduit.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - conduits
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: '{{ .Release.Namespace }}/{{ include "conduit-operator.fullname"
+      . }}-serving-cert'
+  name: '{{ include "conduit-operator.fullname" . }}-validating-webhook-configuration'
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: '{{ include "conduit-operator.fullname" . }}-webhook'
+      namespace: '{{ .Release.Namespace }}'
+      path: /validate-operator-conduit-io-v1-conduit
+  failurePolicy: Fail
+  name: vconduit.kb.io
+  rules:
+  - apiGroups:
+    - operator.conduit.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - conduits
+  sideEffects: None

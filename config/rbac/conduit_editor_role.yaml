@@ -1,0 +1,24 @@
+# permissions for end users to edit conduits.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: conduit-editor-role
+rules:
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits/status
+  verbs:
+  - get

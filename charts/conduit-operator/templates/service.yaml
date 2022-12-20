@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "conduit-operator.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "conduit-operator.labels" . | nindent 4 }}
+spec:
+  ports:
+  - port: 443
+    targetPort: 9443
+  selector:
+    {{- include "conduit-operator.selectorLabels" . | nindent 4 }}

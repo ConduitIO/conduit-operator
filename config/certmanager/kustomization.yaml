@@ -1,0 +1,8 @@
+namespace: '{{ .Release.Namespace }}'
+namePrefix: '{{ include "conduit-operator.fullname" . }}-'
+
+resources:
+- certificate.yaml
+
+configurations:
+- kustomizeconfig.yaml

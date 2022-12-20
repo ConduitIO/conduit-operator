@@ -1,0 +1,47 @@
+version: "2.0"
+pipelines:
+    - id: my-pipeline
+      status: running
+      name: my-pipeline
+      description: my-description
+      connectors:
+        - id: source-connector
+          type: source
+          plugin: standalone:generator
+          name: source-connector
+          settings:
+            setting1: setting1-val
+            setting2: setting2-val
+            setting3: ${SETTING3__S_KEY}
+          processors:
+            - id: proc1src
+              type: js
+              settings:
+                setting0: ${SETTING0__P_KEY}
+                setting100: setting100-val
+              workers: 0
+        - id: destination-connector
+          type: destination
+          plugin: builtin:file
+          name: destination-connector
+          settings:
+            setting2: ${SETTING2__AKEY}
+          processors:
+            - id: proc1dest
+              type: js
+              settings:
+                setting0: ${SETTING0__P_KEY}
+                setting100: setting100-val
+              workers: 0
+      processors:
+        - id: proc1
+          type: yaml
+          settings:
+            setting101: ${SETTING101__P_KEY}
+            setting200: setting200-val
+          workers: 0
+      dead-letter-queue:
+        plugin: ""
+        settings: {}
+        window-size: null
+        window-nack-threshold: null

@@ -1,0 +1,30 @@
+apiVersion: operator.conduit.io/v1
+kind: Conduit
+metadata:
+  name: conduit-with-procs
+spec:
+  running: true
+  name: generator.proc.log
+  description: redacting generator pipline
+  connectors:
+    - name: source-connector
+      type: source
+      plugin: builtin:generator
+      settings:
+        - name: format.type
+          value: structured
+        - name: format.options
+          value: "id:int,name:string,company:string,password:string,trial:bool"
+        - name: recordCount
+          value: "3"
+      processors:
+        - name: sourceproc
+          type: maskfieldpayload
+          settings:
+            - name: field
+              value: password
+            - name: replacement
+              value: "[redacted]"
+    - name: destination-connector
+      type: destination
+      plugin: builtin:log

@@ -1,0 +1,27 @@
+namespace: '{{ .Release.Namespace }}'
+namePrefix: '{{ include "conduit-operator.fullname" . }}-'
+
+resources:
+- manifests.yaml
+# Disable service kustomization because of helm templating
+# - service.yaml
+
+patches:
+- patch: |-
+    - op: replace
+      path: /webhooks/0/clientConfig/service/name
+      value: '{{ include "conduit-operator.fullname" . }}-webhook'
+  target:
+    kind: MutatingWebhookConfiguration
+- patch: |-
+    - op: replace
+      path: /webhooks/0/clientConfig/service/name
+      value: '{{ include "conduit-operator.fullname" . }}-webhook'
+  target:
+    kind: ValidatingWebhookConfiguration
+
+configurations:
+- kustomizeconfig.yaml
+
+patchesStrategicMerge:
+- webhookcainjection_patch.yaml

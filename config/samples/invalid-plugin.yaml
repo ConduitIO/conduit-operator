@@ -1,0 +1,17 @@
+apiVersion: operator.conduit.io/v1
+kind: Conduit
+metadata:
+  name: conduit-sample
+spec:
+  running: true
+  name: file-pipeline
+  description: test pipline
+  connectors:
+    - name: source-connector
+      type: source
+      plugin: foobar 
+      settings:
+        - name: path
+          secretRef:
+            key: source_file
+            name: conduit-sample

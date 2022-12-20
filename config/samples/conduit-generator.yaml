@@ -1,0 +1,22 @@
+apiVersion: operator.conduit.io/v1
+kind: Conduit
+metadata:
+  name: conduit-generator
+spec:
+  running: true
+  name: generator.log
+  description: generator pipline
+  connectors:
+    - name: source-connector
+      type: source
+      plugin: builtin:generator
+      settings:
+        - name: format.type
+          value: structured
+        - name: format.options
+          value: "id:int,name:string,company:string,trial:bool"
+        - name: recordCount
+          value: "3"
+    - name: destination-connector
+      type: destination
+      plugin: builtin:log
