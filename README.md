@@ -20,7 +20,7 @@ metadata:
 spec:
   running: true
   name: generator.log
-  description: generator pipline
+  description: generator pipeline
   connectors:
     - name: source-connector
       type: source
@@ -48,7 +48,7 @@ metadata:
 spec:
   running: true
   name: generator.log
-  description: generator pipline
+  description: generator pipeline
   connectors:
     - name: source-connector
       type: source
