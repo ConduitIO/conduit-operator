@@ -1,32 +1,14 @@
-## Description of change
+### Description
 
-<!-- Provide a brief description of the change, what it is and why it was made below.* -->
+Please include a summary of the change and what type of change it is (new feature, bug fix, refactoring, documentation).
+Please also include relevant motivation and context.
+List any dependencies that are required for this change.
 
-Fixes <GitHub Issue>
+Fixes # (issue)
 
-## Type of change
+### Quick checks:
 
-<!-- Please tick off the correct checkbox after saving the PR description. -->
-
-- [ ]  New feature
-- [ ]  Bug fix
-- [ ]  Refactor
-- [ ]  Documentation
-
-## How was this tested?
-
-- [ ]  Unit Tests
-- [ ]  Tested in staging
-- [ ]  Tested in minikube
-
-## Demo
-
-<!-- Provide examples of how the feature looked before and after this change in the table below -->
-| before | after |
-|--------|-------|
-|<!-- Replace this with a screenshot/gif -->|<!-- Replace this with a screenshot/gif -->|
-
-
-## Additional references
-
-<!-- Post any additional links (if appropriate) below -->
+- [ ] I have followed the [Code Guidelines](https://github.com/ConduitIO/conduit/blob/main/docs/code_guidelines.md).
+- [ ] There is no other [pull request](https://github.com/conduitio-labs/conduit-connector-salesforce/pulls) for the same update/change.
+- [ ] I have written unit tests.
+- [ ] I have made sure that the PR is of reasonable size and can be easily reviewed.
