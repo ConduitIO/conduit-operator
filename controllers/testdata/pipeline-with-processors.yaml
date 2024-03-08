@@ -16,6 +16,7 @@ pipelines:
           processors:
             - id: proc1src
               type: js
+              condition: ""
               settings:
                 setting0: ${SETTING0__P_KEY}
                 setting100: setting100-val
@@ -29,6 +30,7 @@ pipelines:
           processors:
             - id: proc1dest
               type: js
+              condition: ""
               settings:
                 setting0: ${SETTING0__P_KEY}
                 setting100: setting100-val
@@ -36,6 +38,7 @@ pipelines:
       processors:
         - id: proc1
           type: yaml
+          condition: ""
           settings:
             setting101: ${SETTING101__P_KEY}
             setting200: setting200-val

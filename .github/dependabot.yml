@@ -17,6 +17,10 @@ updates:
       interval: "daily"
     commit-message:
       prefix: "go.mod:"
+    ignore:
+      - dependency: github.com/conduitio/conduit
+        # ignore minor updates, since conduit minor updates can be major (no puns)
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   # Maintain dependencies for Docker
   - package-ecosystem: "docker"
