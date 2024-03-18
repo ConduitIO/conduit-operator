@@ -279,7 +279,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 					RestartPolicy:  corev1.RestartPolicyAlways,
 					InitContainers: ConduitInitContainers(c.Spec.Connectors),
 					Containers: []corev1.Container{
-						ConduitRuntimeContainer(c.ImageName(), EnvVars(c)),
+						ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, EnvVars(c)),
 					},
 					Volumes: []corev1.Volume{
 						ConduitVolume(nn.Name),

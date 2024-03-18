@@ -6,6 +6,8 @@ spec:
   running: true
   name: generator.log
   description: generator pipeline
+  image: ghcr.io/conduitio/conduit
+  version: v0.9.0
   connectors:
     - name: source-connector
       type: source

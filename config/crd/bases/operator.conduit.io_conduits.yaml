@@ -148,6 +148,8 @@ spec:
                 type: array
               description:
                 type: string
+              image:
+                type: string
               name:
                 type: string
               processors:

@@ -5,7 +5,7 @@ metadata:
 spec:
   running: true
   name: generator.proc.log
-  description: redacting generator pipline
+  description: redacting generator pipeline
   connectors:
     - name: source-connector
       type: source
