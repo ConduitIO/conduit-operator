@@ -13,9 +13,21 @@ import (
 )
 
 func Test_ConduitInitContainers(t *testing.T) {
+	initContainer := corev1.Container{
+		Name:            "conduit-init",
+		Image:           "golang:1.22",
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Args: []string{
+			"sh", "-xe", "-c",
+			"mkdir -p /conduit.storage/processors /conduit.storage/connectors",
+		},
+		VolumeMounts: []corev1.VolumeMount{{Name: "conduit-storage", MountPath: "/conduit.storage"}},
+	}
+
 	tests := []struct {
 		name       string
 		connectors []*v1.ConduitConnector
+		imageVer   string
 		want       []corev1.Container
 	}{
 		{
@@ -26,7 +38,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 					PluginVersion: "latest",
 				},
 			},
-			want: []corev1.Container{},
+			want: []corev1.Container{initContainer},
 		},
 		{
 			name: "with latest standalone connector",
@@ -42,8 +54,9 @@ func Test_ConduitInitContainers(t *testing.T) {
 				},
 			},
 			want: []corev1.Container{
+				initContainer,
 				{
-					Name:            "conduit-connector-init",
+					Name:            "conduit-init-connectors",
 					Image:           "golang:1.22",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
@@ -73,8 +86,9 @@ func Test_ConduitInitContainers(t *testing.T) {
 				},
 			},
 			want: []corev1.Container{
+				initContainer,
 				{
-					Name:            "conduit-connector-init",
+					Name:            "conduit-init-connectors",
 					Image:           "golang:1.22",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
@@ -109,8 +123,9 @@ func Test_ConduitInitContainers(t *testing.T) {
 				},
 			},
 			want: []corev1.Container{
+				initContainer,
 				{
-					Name:            "conduit-connector-init",
+					Name:            "conduit-init-connectors",
 					Image:           "golang:1.22",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
@@ -145,8 +160,9 @@ func Test_ConduitInitContainers(t *testing.T) {
 				},
 			},
 			want: []corev1.Container{
+				initContainer,
 				{
-					Name:            "conduit-connector-init",
+					Name:            "conduit-init-connectors",
 					Image:           "golang:1.22",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
@@ -177,7 +193,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 func Test_ConduitRuntimeContainer(t *testing.T) {
 	want := corev1.Container{
 		Name:            "conduit-server",
-		Image:           "my-image",
+		Image:           "my-image:v0.8.0",
 		ImagePullPolicy: corev1.PullAlways,
 		Args: []string{
 			"/app/conduit",
@@ -237,6 +253,89 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 
 	got := ctrls.ConduitRuntimeContainer(
 		"my-image",
+		"v0.8.0",
+		[]corev1.EnvVar{
+			{
+				Name:  "var-1",
+				Value: "val-1",
+			},
+			{
+				Name:  "var-2",
+				Value: "val-2",
+			},
+		},
+	)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("container mismatch (-want +got): %v", diff)
+	}
+}
+
+func Test_ConduitRuntimeContainerProcessors(t *testing.T) {
+	want := corev1.Container{
+		Name:            "conduit-server",
+		Image:           "my-image:v0.9.1",
+		ImagePullPolicy: corev1.PullAlways,
+		Args: []string{
+			"/app/conduit",
+			"-pipelines.path", "/conduit.pipelines/pipeline.yaml",
+			"-connectors.path", "/conduit.storage/connectors",
+			"-db.type", "badger",
+			"-db.badger.path", "/conduit.storage/db",
+			"-pipelines.exit-on-error",
+			"-processors.path",
+			"/conduit.storage/processors",
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          "http",
+				ContainerPort: 8080,
+				Protocol:      corev1.ProtocolTCP,
+			},
+			{
+				Name:          "grpc",
+				ContainerPort: 8084,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		},
+		ReadinessProbe: &corev1.Probe{
+			ProbeHandler: corev1.ProbeHandler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path:   "/healthz",
+					Scheme: "HTTP",
+					Port:   intstr.FromString("http"),
+				},
+			},
+			TimeoutSeconds:   1,
+			PeriodSeconds:    10,
+			SuccessThreshold: 1,
+			FailureThreshold: 3,
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "conduit-storage",
+				MountPath: "/conduit.storage",
+			},
+			{
+				Name:      "conduit-pipelines",
+				MountPath: "/conduit.pipelines",
+				ReadOnly:  true,
+			},
+		},
+		Env: []corev1.EnvVar{
+			{
+				Name:  "var-1",
+				Value: "val-1",
+			},
+			{
+				Name:  "var-2",
+				Value: "val-2",
+			},
+		},
+	}
+
+	got := ctrls.ConduitRuntimeContainer(
+		"my-image",
+		"v0.9.1",
 		[]corev1.EnvVar{
 			{
 				Name:  "var-1",

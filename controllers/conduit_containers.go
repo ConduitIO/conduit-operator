@@ -77,6 +77,24 @@ func (c *commandBuilder) addConnectorBuild(b connectorBuild) {
 func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
 	builder := &commandBuilder{}
 
+	containers := []corev1.Container{
+		{
+			Name:            v1.ConduitInitContainerName,
+			Image:           v1.ConduitInitImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Args: []string{
+				"sh", "-xe", "-c",
+				fmt.Sprintf("mkdir -p %s %s", v1.ConduitProcessorsPath, v1.ConduitConnectorsPath),
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      v1.ConduitStorageVolumeMount,
+					MountPath: v1.ConduitVolumePath,
+				},
+			},
+		},
+	}
+
 	for _, c := range cc {
 		if strings.HasPrefix(c.Plugin, "builtin") {
 			continue
@@ -90,13 +108,9 @@ func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
 		})
 	}
 
-	if builder.empty() {
-		return []corev1.Container{}
-	}
-
-	return []corev1.Container{
-		{
-			Name:            v1.ConduitInitContainerName,
+	if !builder.empty() {
+		containers = append(containers, corev1.Container{
+			Name:            fmt.Sprint(v1.ConduitInitContainerName, "-connectors"),
 			Image:           v1.ConduitInitImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Args: []string{
@@ -109,25 +123,33 @@ func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
 					MountPath: v1.ConduitVolumePath,
 				},
 			},
-		},
+		})
 	}
+
+	return containers
 }
 
 // ConduitRuntimeContainer returns a Kubernetes container definition
 // todo is the pipelineName supposed to be used?
-func ConduitRuntimeContainer(image string, envVars []corev1.EnvVar) corev1.Container {
+func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) corev1.Container {
+	args := []string{
+		"/app/conduit",
+		"-pipelines.path", v1.ConduitPipelineFile,
+		"-connectors.path", v1.ConduitConnectorsPath,
+		"-db.type", "badger",
+		"-db.badger.path", v1.ConduitDBPath,
+		"-pipelines.exit-on-error",
+	}
+
+	if withProcessors(version) {
+		args = append(args, "-processors.path", v1.ConduitProcessorsPath)
+	}
+
 	return corev1.Container{
 		Name:            v1.ConduitContainerName,
-		Image:           image,
+		Image:           fmt.Sprint(image, ":", version),
 		ImagePullPolicy: corev1.PullAlways,
-		Args: []string{
-			"/app/conduit",
-			"-pipelines.path", v1.ConduitPipelineFile,
-			"-connectors.path", v1.ConduitConnectorsPath,
-			"-db.type", "badger",
-			"-db.badger.path", v1.ConduitDBPath,
-			"-pipelines.exit-on-error",
-		},
+		Args:            args,
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "http",

@@ -32,6 +32,10 @@ func (r *Conduit) Default() {
 		}
 	}
 
+	if r.Spec.Image == "" {
+		r.Spec.Image = ConduitImage
+	}
+
 	if r.Spec.Version == "" {
 		r.Spec.Version = ConduitVersion
 	}

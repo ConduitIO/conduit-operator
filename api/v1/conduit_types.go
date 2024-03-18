@@ -38,47 +38,55 @@ var conduitConditions = NewConditionSet(
 )
 
 const (
-	ConduitVersion             = "0.8.0"
+	ConduitVersion             = "v0.9.0"
 	ConduitImage               = "ghcr.io/conduitio/conduit"
 	ConduitContainerName       = "conduit-server"
 	ConduitPipelinePath        = "/conduit.pipelines"
 	ConduitVolumePath          = "/conduit.storage"
 	ConduitDBPath              = "/conduit.storage/db"
 	ConduitConnectorsPath      = "/conduit.storage/connectors"
+	ConduitProcessorsPath      = "/conduit.storage/processors"
 	ConduitStorageVolumeMount  = "conduit-storage"
 	ConduitPipelineVolumeMount = "conduit-pipelines"
 	ConduitInitImage           = "golang:1.22"
-	ConduitInitContainerName   = "conduit-connector-init"
+	ConduitInitContainerName   = "conduit-init"
 )
 
-var ConduitPipelineFile = path.Join(ConduitPipelinePath, "pipeline.yaml")
+var (
+	ConduitPipelineFile          = path.Join(ConduitPipelinePath, "pipeline.yaml")
+	ConduitWithProcessorsVersion = "0.9.0"
+)
 
 // ConduitSpec defines the desired state of Conduit
 type ConduitSpec struct {
-	Running     bool                `json:"running,omitempty"`
-	Name        string              `json:"name,omitempty"`
-	Version     string              `json:"version,omitempty"`
-	Description string              `json:"description,omitempty"`
-	Connectors  []*ConduitConnector `json:"connectors,omitempty"`
-	Processors  []*ConduitProcessor `json:"processors,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Image       string `json:"image,omitempty"`
+	Running     bool   `json:"running,omitempty"`
+	Version     string `json:"version,omitempty"`
+
+	Connectors []*ConduitConnector `json:"connectors,omitempty"`
+	Processors []*ConduitProcessor `json:"processors,omitempty"`
 }
 
 type ConduitConnector struct {
-	Name          string              `json:"name,omitempty"`
-	Plugin        string              `json:"plugin,omitempty"`
-	PluginPkg     string              `json:"pluginPkg,omitempty"`
-	PluginName    string              `json:"pluginName,omitempty"`
-	PluginVersion string              `json:"pluginVersion,omitempty"`
-	Type          string              `json:"type,omitempty"`
-	Settings      []SettingsVar       `json:"settings,omitempty"`
-	Processors    []*ConduitProcessor `json:"processors,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Type          string `json:"type,omitempty"`
+	Plugin        string `json:"plugin,omitempty"`
+	PluginName    string `json:"pluginName,omitempty"`
+	PluginPkg     string `json:"pluginPkg,omitempty"`
+	PluginVersion string `json:"pluginVersion,omitempty"`
+
+	Settings   []SettingsVar       `json:"settings,omitempty"`
+	Processors []*ConduitProcessor `json:"processors,omitempty"`
 }
 
 type ConduitProcessor struct {
-	Name     string        `json:"name,omitempty"`
-	Type     string        `json:"type,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Workers int    `json:"workers,omitempty"`
+
 	Settings []SettingsVar `json:"settings,omitempty"`
-	Workers  int           `json:"workers,omitempty"`
 }
 
 type GlobalConfigMapRef struct {
@@ -132,13 +140,9 @@ type Conduit struct {
 
 func (r *Conduit) NamespacedName() types.NamespacedName {
 	return types.NamespacedName{
-		Name:      fmt.Sprintf("conduit-server-%s", r.Name),
+		Name:      fmt.Sprint("conduit-server-", r.Name),
 		Namespace: r.Namespace,
 	}
-}
-
-func (r *Conduit) ImageName() string {
-	return fmt.Sprintf("%s:v%s", ConduitImage, r.Spec.Version)
 }
 
 //+kubebuilder:object:root=true
