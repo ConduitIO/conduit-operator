@@ -73,30 +73,14 @@ func (c *commandBuilder) addConnectorBuild(b connectorBuild) {
 	c.done[b.goPkg] = true
 }
 
-// ConduitInitContainers returns a slice of kubernetes container definitions
-func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
+func builderContainer(cc []*v1.ConduitConnector) *corev1.Container {
 	builder := &commandBuilder{}
 
-	containers := []corev1.Container{
-		{
-			Name:            v1.ConduitInitContainerName,
-			Image:           v1.ConduitInitImage,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Args: []string{
-				"sh", "-xe", "-c",
-				fmt.Sprintf("mkdir -p %s %s", v1.ConduitProcessorsPath, v1.ConduitConnectorsPath),
-			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      v1.ConduitStorageVolumeMount,
-					MountPath: v1.ConduitVolumePath,
-				},
-			},
-		},
-	}
-
 	for _, c := range cc {
-		if strings.HasPrefix(c.Plugin, "builtin") {
+		switch {
+		case
+			strings.HasPrefix(c.Plugin, "builtin"),
+			strings.Contains(c.Plugin, "conduit-kafka-connect-wrapper"):
 			continue
 		}
 		builder.addConnectorBuild(connectorBuild{
@@ -108,22 +92,61 @@ func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
 		})
 	}
 
-	if !builder.empty() {
-		containers = append(containers, corev1.Container{
-			Name:            fmt.Sprint(v1.ConduitInitContainerName, "-connectors"),
-			Image:           v1.ConduitInitImage,
-			ImagePullPolicy: corev1.PullIfNotPresent,
-			Args: []string{
-				"sh", "-xe",
-				"-c", builder.renderScript(),
+	if builder.empty() {
+		return nil
+	}
+
+	return &corev1.Container{
+		Name:            fmt.Sprint(v1.ConduitInitContainerName, "-connectors"),
+		Image:           v1.ConduitInitImage,
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Args: []string{
+			"sh", "-xe",
+			"-c", builder.renderScript(),
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      v1.ConduitStorageVolumeMount,
+				MountPath: v1.ConduitVolumePath,
 			},
-			VolumeMounts: []corev1.VolumeMount{
-				{
-					Name:      v1.ConduitStorageVolumeMount,
-					MountPath: v1.ConduitVolumePath,
-				},
+		},
+	}
+}
+
+func initContainer(image, version string) *corev1.Container {
+	initscript := []string{
+		// initialize connector/processors storage
+		fmt.Sprint("mkdir -p ", v1.ConduitProcessorsPath, " ", v1.ConduitConnectorsPath),
+		// copy vendored connectors directory
+		fmt.Sprintf("(test -d /connectors && cp -pr /connectors/. %s/) || true", v1.ConduitConnectorsPath),
+	}
+
+	return &corev1.Container{
+		Name:            v1.ConduitInitContainerName,
+		Image:           fmt.Sprint(image, ":", version),
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Args: []string{
+			"sh", "-xe", "-c", strings.Join(initscript, " && "),
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      v1.ConduitStorageVolumeMount,
+				MountPath: v1.ConduitVolumePath,
 			},
-		})
+		},
+	}
+}
+
+// ConduitInitContainers returns a slice of kubernetes init container definitions
+func ConduitInitContainers(image, version string, cc []*v1.ConduitConnector) []corev1.Container {
+	var containers []corev1.Container
+
+	if ic := initContainer(image, version); ic != nil {
+		containers = append(containers, *ic)
+	}
+
+	if bc := builderContainer(cc); bc != nil {
+		containers = append(containers, *bc)
 	}
 
 	return containers

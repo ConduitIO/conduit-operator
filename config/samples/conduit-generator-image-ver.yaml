@@ -6,7 +6,7 @@ spec:
   running: true
   name: generator.log
   description: generator pipeline
-  image: ghcr.io/conduitio/conduit
+  image: meroxa/conduit-kafka-connect-wrapper 
   version: v0.9.0
   connectors:
     - name: source-connector

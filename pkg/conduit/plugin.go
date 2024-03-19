@@ -17,11 +17,12 @@ var forbiddenConnectors = []string{
 }
 
 const (
-	KafkaPlugin     = "builtin:kafka"
-	GeneratorPlugin = "builtin:generator"
-	S3Plugin        = "builtin:s3"
-	PostgresPlugin  = "builtin:postgres"
-	LogPlugin       = "builtin:log"
+	KafkaPlugin         = "builtin:kafka"
+	GeneratorPlugin     = "builtin:generator"
+	S3Plugin            = "builtin:s3"
+	PostgresPlugin      = "builtin:postgres"
+	LogPlugin           = "builtin:log"
+	KafkaConnectWrapper = "conduit-kafka-connect-wrapper"
 
 	sourceConnector = "source"
 	destConnector   = "destination"
@@ -39,7 +40,8 @@ func ValidatePlugin(name string) error {
 		GeneratorPlugin,
 		S3Plugin,
 		PostgresPlugin,
-		LogPlugin:
+		LogPlugin,
+		KafkaConnectWrapper:
 
 		return nil
 	}

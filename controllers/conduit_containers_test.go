@@ -182,7 +182,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ctrls.ConduitInitContainers(tc.connectors)
+			got := ctrls.ConduitInitContainers("image", "0.9.0", tc.connectors)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Fatalf("container mismatch (-want +got): %v", diff)
 			}
