@@ -10,6 +10,7 @@ CERT_MANAGER      := https://github.com/cert-manager/cert-manager/releases/downl
 KUSTOMIZE_VERSION ?= v4.5.7
 CTRL_GEN_VERSION  ?= v0.14.0
 KIND_VERSION      ?= v0.22.0
+GOLINT_VERSION    ?= v1.61.0
 
 .EXPORT_ALL_VARIABLES:
 
@@ -48,7 +49,7 @@ vet: lint
 
 .PHONY: test
 test:
-	go test ./... -coverprofile cover.out
+	go test -race ./... -coverprofile cover.out
 
 .PHONY: vet lint
 vet: lint
@@ -59,7 +60,7 @@ gomod:
 	go mod tidy
 
 bin/golangci-lint:
-	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.55.2
+	GOBIN=$(PWD)/bin go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLINT_VERSION)
 
 .PHONY: build
 build:
