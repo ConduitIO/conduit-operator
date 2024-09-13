@@ -4,13 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/conduitio-labs/conduit-operator/controllers/mock"
+	"github.com/conduitio/conduit-operator/controllers/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
-	ctrls "github.com/conduitio-labs/conduit-operator/controllers"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
+	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
 func Test_EnvVars(t *testing.T) {

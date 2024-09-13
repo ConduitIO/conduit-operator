@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
 	"github.com/go-logr/logr"
 	"github.com/hashicorp/go-multierror"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

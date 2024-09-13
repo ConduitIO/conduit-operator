@@ -1,4 +1,4 @@
-module github.com/conduitio-labs/conduit-operator
+module github.com/conduitio/conduit-operator
 
 go 1.23.1
 
@@ -326,7 +326,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	honnef.co/go/tools v0.5.1 // indirect
 	k8s.io/apiextensions-apiserver v0.31.1 // indirect
-	k8s.io/component-base v0.31.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240903163716-9e1beecbcb38 // indirect
 	k8s.io/utils v0.0.0-20240902221715-702e33fdd3c3 // indirect

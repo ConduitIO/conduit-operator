@@ -8,7 +8,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
 	cyaml "github.com/conduitio/conduit/pkg/provisioning/config/yaml/v2"
 	"github.com/conduitio/yaml/v3"
 	corev1 "k8s.io/api/core/v1"

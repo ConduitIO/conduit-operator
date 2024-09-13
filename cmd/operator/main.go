@@ -18,8 +18,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
-	"github.com/conduitio-labs/conduit-operator/controllers"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
+	"github.com/conduitio/conduit-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

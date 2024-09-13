@@ -3,7 +3,7 @@ package mock
 import (
 	"fmt"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
