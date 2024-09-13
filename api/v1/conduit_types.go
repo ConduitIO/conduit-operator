@@ -38,7 +38,7 @@ var conduitConditions = NewConditionSet(
 )
 
 const (
-	ConduitVersion             = "v0.9.0"
+	ConduitVersion             = "v0.11.1"
 	ConduitImage               = "ghcr.io/conduitio/conduit"
 	ConduitContainerName       = "conduit-server"
 	ConduitPipelinePath        = "/conduit.pipelines"
@@ -48,7 +48,7 @@ const (
 	ConduitProcessorsPath      = "/conduit.storage/processors"
 	ConduitStorageVolumeMount  = "conduit-storage"
 	ConduitPipelineVolumeMount = "conduit-pipelines"
-	ConduitInitImage           = "golang:1.22"
+	ConduitInitImage           = "golang:1.23-alpine"
 	ConduitInitContainerName   = "conduit-init"
 )
 
