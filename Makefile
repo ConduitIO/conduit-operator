@@ -7,8 +7,9 @@ NAME              := conduit-operator
 
 CERT_MANAGER      := https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.yaml
 
-KUSTOMIZE_VERSION ?= v4.5.7
-CTRL_GEN_VERSION  ?= v0.14.0
+# KUSTOMIZE_VERSION ?= v4.5.7
+KUSTOMIZE_VERSION ?= v5.4.3
+CTRL_GEN_VERSION  ?= v0.16.3
 KIND_VERSION      ?= v0.22.0
 GOLINT_VERSION    ?= v1.61.0
 
@@ -69,7 +70,7 @@ build:
 # Rebuild and kustomize custom resource definitions
 
 bin/kustomize:
-	GOBIN=$(PWD)/bin go install sigs.k8s.io/kustomize/kustomize/v4@$(KUSTOMIZE_VERSION)
+	GOBIN=$(PWD)/bin go install sigs.k8s.io/kustomize/kustomize/v5@$(KUSTOMIZE_VERSION)
 
 bin/controller-gen:
 	GOBIN=$(PWD)/bin go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CTRL_GEN_VERSION)
