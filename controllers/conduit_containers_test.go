@@ -15,7 +15,7 @@ import (
 func Test_ConduitInitContainers(t *testing.T) {
 	initContainer := corev1.Container{
 		Name:            "conduit-init",
-		Image:           "golang:1.22",
+		Image:           "golang:1.23-alpine",
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		Args: []string{
 			"sh", "-xe", "-c",
@@ -57,7 +57,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 				initContainer,
 				{
 					Name:            "conduit-init-connectors",
-					Image:           "golang:1.22",
+					Image:           "golang:1.23-alpine",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
 						"sh", "-xe",
@@ -89,7 +89,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 				initContainer,
 				{
 					Name:            "conduit-init-connectors",
-					Image:           "golang:1.22",
+					Image:           "golang:1.23-alpine",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
 						"sh", "-xe",
@@ -126,7 +126,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 				initContainer,
 				{
 					Name:            "conduit-init-connectors",
-					Image:           "golang:1.22",
+					Image:           "golang:1.23-alpine",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
 						"sh", "-xe",
@@ -163,7 +163,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 				initContainer,
 				{
 					Name:            "conduit-init-connectors",
-					Image:           "golang:1.22",
+					Image:           "golang:1.23-alpine",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Args: []string{
 						"sh", "-xe",

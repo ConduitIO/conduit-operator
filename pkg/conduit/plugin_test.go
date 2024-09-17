@@ -130,6 +130,7 @@ func Test_ValidatePluginType(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			is := is.New(t)
 			err := conduit.ValidatePluginType(tc.pluginType)
 			if tc.wantErr != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())

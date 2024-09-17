@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.22 as builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -22,7 +22,7 @@ RUN go build -a -o conduit-operator cmd/operator/main.go
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 # FROM gcr.io/distroless/static:nonroot
 
-FROM golang:1.22
+FROM alpine:3.20
 WORKDIR /app
 COPY --from=builder /workspace/conduit-operator /app
 USER 65532:65532

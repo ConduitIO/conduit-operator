@@ -10,7 +10,7 @@ import (
 
 	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
 	cyaml "github.com/conduitio/conduit/pkg/provisioning/config/yaml/v2"
-	"gopkg.in/yaml.v3"
+	"github.com/conduitio/yaml/v3"
 	corev1 "k8s.io/api/core/v1"
 )
 
