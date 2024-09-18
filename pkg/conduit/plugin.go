@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-var allowedGithubOrgs = []string{
+var allowedGitHubOrgs = []string{
 	"conduitio/",
 	"conduitio-labs/",
 	"meroxa/",
@@ -50,7 +50,7 @@ func ValidatePlugin(name string) error {
 		}
 	}
 
-	for _, org := range allowedGithubOrgs {
+	for _, org := range allowedGitHubOrgs {
 		switch {
 		case strings.HasPrefix(trimmedName, org):
 			return nil
