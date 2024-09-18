@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 )
 
 func init() {
 	// validate constraint
-	constraint := fmt.Sprint(">= ", v1.ConduitWithProcessorsVersion)
+	constraint := fmt.Sprint(">= ", v1alpha.ConduitWithProcessorsVersion)
 	if _, err := semver.NewConstraint(constraint); err != nil {
 		panic(fmt.Errorf("failed to create version constraint: %w", err))
 	}
@@ -24,6 +24,6 @@ func withProcessors(ver string) bool {
 	if err != nil {
 		return false
 	}
-	c, _ := semver.NewConstraint(fmt.Sprint(">= ", v1.ConduitWithProcessorsVersion))
+	c, _ := semver.NewConstraint(fmt.Sprint(">= ", v1alpha.ConduitWithProcessorsVersion))
 	return c.Check(v)
 }

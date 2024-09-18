@@ -9,11 +9,11 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 )
 
-func compareStatusConditions(want, got v1.Conditions) string {
-	return cmp.Diff(want, got, cmpopts.IgnoreFields(v1.Condition{}, []string{
+func compareStatusConditions(want, got v1alpha.Conditions) string {
+	return cmp.Diff(want, got, cmpopts.IgnoreFields(v1alpha.Condition{}, []string{
 		"LastTransitionTime",
 		"Message",
 		"Reason",
@@ -28,14 +28,14 @@ func mustReadFile(file string) string {
 	return string(v)
 }
 
-func sampleConduitWithProcessors(running bool) *v1.Conduit {
+func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	c := sampleConduit(running)
 
-	c.Spec.Processors = []*v1.ConduitProcessor{
+	c.Spec.Processors = []*v1alpha.ConduitProcessor{
 		{
 			Name: "proc1",
 			Type: "yaml",
-			Settings: []v1.SettingsVar{
+			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting101",
 					SecretRef: &corev1.SecretKeySelector{
@@ -58,11 +58,11 @@ func sampleConduitWithProcessors(running bool) *v1.Conduit {
 	}
 
 	// source
-	c.Spec.Connectors[0].Processors = []*v1.ConduitProcessor{
+	c.Spec.Connectors[0].Processors = []*v1alpha.ConduitProcessor{
 		{
 			Name: "proc1src",
 			Type: "js",
-			Settings: []v1.SettingsVar{
+			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting0",
 					SecretRef: &corev1.SecretKeySelector{
@@ -81,11 +81,11 @@ func sampleConduitWithProcessors(running bool) *v1.Conduit {
 	}
 
 	// dest
-	c.Spec.Connectors[1].Processors = []*v1.ConduitProcessor{
+	c.Spec.Connectors[1].Processors = []*v1alpha.ConduitProcessor{
 		{
 			Name: "proc1dest",
 			Type: "js",
-			Settings: []v1.SettingsVar{
+			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting0",
 					SecretRef: &corev1.SecretKeySelector{
@@ -106,22 +106,22 @@ func sampleConduitWithProcessors(running bool) *v1.Conduit {
 	return c
 }
 
-func sampleConduit(running bool) *v1.Conduit {
-	return &v1.Conduit{
+func sampleConduit(running bool) *v1alpha.Conduit {
+	return &v1alpha.Conduit{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sample",
 			Namespace: "sample",
 		},
-		Spec: v1.ConduitSpec{
+		Spec: v1alpha.ConduitSpec{
 			Running:     running,
 			Name:        "my-pipeline",
 			Description: "my-description",
-			Connectors: []*v1.ConduitConnector{
+			Connectors: []*v1alpha.ConduitConnector{
 				{
 					Name:       "source-connector",
 					Type:       "source",
 					PluginName: "standalone:generator",
-					Settings: []v1.SettingsVar{
+					Settings: []v1alpha.SettingsVar{
 						{
 							Name:  "setting1",
 							Value: "setting1-val",
@@ -145,7 +145,7 @@ func sampleConduit(running bool) *v1.Conduit {
 					Name:       "destination-connector",
 					Type:       "destination",
 					PluginName: "builtin:file",
-					Settings: []v1.SettingsVar{
+					Settings: []v1alpha.SettingsVar{
 						{
 							Name: "setting2",
 							SecretRef: &corev1.SecretKeySelector{

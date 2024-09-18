@@ -3,7 +3,7 @@ package mock
 import (
 	"fmt"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
@@ -85,15 +85,15 @@ func (m *pvcMatcher) Matches(x interface{}) bool {
 }
 
 type conduitMatcher struct {
-	want, got *v1.Conduit
+	want, got *v1alpha.Conduit
 }
 
-func NewConduitMatcher(c *v1.Conduit) gomock.Matcher {
+func NewConduitMatcher(c *v1alpha.Conduit) gomock.Matcher {
 	return &conduitMatcher{want: c}
 }
 
 func (m *conduitMatcher) Matches(x interface{}) bool {
-	other, ok := x.(*v1.Conduit)
+	other, ok := x.(*v1alpha.Conduit)
 	if !ok {
 		return false
 	}

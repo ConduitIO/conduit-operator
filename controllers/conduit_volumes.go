@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -32,7 +32,7 @@ func ConduitVolumeClaim(nn types.NamespacedName, size string) *corev1.Persistent
 // ConduitVolume returns a kubernetes volume definition for the provided claim
 func ConduitVolume(claimName string) corev1.Volume {
 	return corev1.Volume{
-		Name: v1.ConduitStorageVolumeMount,
+		Name: v1alpha.ConduitStorageVolumeMount,
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: claimName,
@@ -45,7 +45,7 @@ func ConduitVolume(claimName string) corev1.Volume {
 func ConduitPipelineVol(refName string) corev1.Volume {
 	defaultMode := int32(0o440) // octal, user/group readable
 	return corev1.Volume{
-		Name: v1.ConduitPipelineVolumeMount,
+		Name: v1alpha.ConduitPipelineVolumeMount,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{

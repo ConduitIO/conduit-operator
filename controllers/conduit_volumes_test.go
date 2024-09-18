@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
@@ -45,7 +45,7 @@ func Test_ConduitVolumeClaim(t *testing.T) {
 
 func Test_ConduitVolume(t *testing.T) {
 	want := corev1.Volume{
-		Name: v1.ConduitStorageVolumeMount,
+		Name: v1alpha.ConduitStorageVolumeMount,
 		VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 				ClaimName: "my-claim-name",
@@ -62,7 +62,7 @@ func Test_ConduitVolume(t *testing.T) {
 func Test_ConduitPipelineVol(t *testing.T) {
 	mode := int32(0o440)
 	want := corev1.Volume{
-		Name: v1.ConduitPipelineVolumeMount,
+		Name: v1alpha.ConduitPipelineVolumeMount,
 		VolumeSource: corev1.VolumeSource{
 			ConfigMap: &corev1.ConfigMapVolumeSource{
 				LocalObjectReference: corev1.LocalObjectReference{
