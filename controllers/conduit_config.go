@@ -8,7 +8,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	cyaml "github.com/conduitio/conduit/pkg/provisioning/config/yaml/v2"
 	"github.com/conduitio/yaml/v3"
 	corev1 "k8s.io/api/core/v1"
@@ -18,7 +18,7 @@ const pipelineConfigVersion = "2.0"
 
 // PipelineConfigYAML produces a conduit pipeline configuration in YAML.
 // Invalid configuration will result in a marshalling error.
-func PipelineConfigYAML(ctx context.Context, client client.Client, conduit *v1.Conduit) (string, error) {
+func PipelineConfigYAML(ctx context.Context, client client.Client, conduit *v1alpha.Conduit) (string, error) {
 	var (
 		spec           = conduit.Spec
 		pipelineStatus = "stopped"
@@ -70,7 +70,7 @@ func PipelineConfigYAML(ctx context.Context, client client.Client, conduit *v1.C
 
 // EnvVars returns a slice of EnvVar with all connector settings.
 // Only secrets are put into environment variables.
-func EnvVars(c *v1.Conduit) []corev1.EnvVar {
+func EnvVars(c *v1alpha.Conduit) []corev1.EnvVar {
 	var envVars []corev1.EnvVar
 	for _, cc := range c.Spec.Connectors {
 		for _, v := range cc.Settings {
@@ -92,7 +92,7 @@ func EnvVars(c *v1.Conduit) []corev1.EnvVar {
 
 // settingsWithEnvVars converts settings to a map, every secret key
 // reference is converted to env var reference.
-func settingsWithEnvVars(ctx context.Context, client client.Client, s []v1.SettingsVar) (map[string]string, error) {
+func settingsWithEnvVars(ctx context.Context, client client.Client, s []v1alpha.SettingsVar) (map[string]string, error) {
 	settings := make(map[string]string)
 	for _, v := range s {
 		switch {
@@ -112,7 +112,7 @@ func settingsWithEnvVars(ctx context.Context, client client.Client, s []v1.Setti
 	return settings, nil
 }
 
-func configMapValue(ctx context.Context, cl client.Client, ref *v1.GlobalConfigMapRef) (string, error) {
+func configMapValue(ctx context.Context, cl client.Client, ref *v1alpha.GlobalConfigMapRef) (string, error) {
 	configMap := &corev1.ConfigMap{}
 
 	// Fetch the ConfigMap using the client's Get method
@@ -146,7 +146,7 @@ func envVarName(s string) string {
 // connectorConfig returns a conduit connector config which is created
 // from a connector resource settings. Settings which refer to a secret are
 // converted to env variables.
-func connectorConfig(ctx context.Context, cl client.Client, c *v1.ConduitConnector) (cyaml.Connector, error) {
+func connectorConfig(ctx context.Context, cl client.Client, c *v1alpha.ConduitConnector) (cyaml.Connector, error) {
 	var processors []cyaml.Processor
 	for _, p := range c.Processors {
 		procCfg, err := processorConfig(ctx, cl, p)
@@ -173,7 +173,7 @@ func connectorConfig(ctx context.Context, cl client.Client, c *v1.ConduitConnect
 	}, nil
 }
 
-func processorConfig(ctx context.Context, cl client.Client, p *v1.ConduitProcessor) (cyaml.Processor, error) {
+func processorConfig(ctx context.Context, cl client.Client, p *v1alpha.ConduitProcessor) (cyaml.Processor, error) {
 	settings, err := settingsWithEnvVars(ctx, cl, p.Settings)
 	if err != nil {
 		return cyaml.Processor{}, fmt.Errorf("failed getting settings for processor %v: %w", p.Name, err)

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -74,22 +74,22 @@ func (c *commandBuilder) addConnectorBuild(b connectorBuild) {
 }
 
 // ConduitInitContainers returns a slice of kubernetes container definitions
-func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
+func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 	builder := &commandBuilder{}
 
 	containers := []corev1.Container{
 		{
-			Name:            v1.ConduitInitContainerName,
-			Image:           v1.ConduitInitImage,
+			Name:            v1alpha.ConduitInitContainerName,
+			Image:           v1alpha.ConduitInitImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Args: []string{
 				"sh", "-xe", "-c",
-				fmt.Sprintf("mkdir -p %s %s", v1.ConduitProcessorsPath, v1.ConduitConnectorsPath),
+				fmt.Sprintf("mkdir -p %s %s", v1alpha.ConduitProcessorsPath, v1alpha.ConduitConnectorsPath),
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
-					Name:      v1.ConduitStorageVolumeMount,
-					MountPath: v1.ConduitVolumePath,
+					Name:      v1alpha.ConduitStorageVolumeMount,
+					MountPath: v1alpha.ConduitVolumePath,
 				},
 			},
 		},
@@ -103,15 +103,15 @@ func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
 			name:      fmt.Sprintf("%s-%s", filepath.Base(c.Plugin), c.PluginVersion),
 			goPkg:     c.PluginPkg,
 			tmpDir:    builderTempPath,
-			targetDir: v1.ConduitConnectorsPath,
+			targetDir: v1alpha.ConduitConnectorsPath,
 			ldflags:   fmt.Sprintf(`-ldflags "-X 'github.com/%s.version=%s'"`, c.Plugin, c.PluginVersion),
 		})
 	}
 
 	if !builder.empty() {
 		containers = append(containers, corev1.Container{
-			Name:            fmt.Sprint(v1.ConduitInitContainerName, "-connectors"),
-			Image:           v1.ConduitInitImage,
+			Name:            fmt.Sprint(v1alpha.ConduitInitContainerName, "-connectors"),
+			Image:           v1alpha.ConduitInitImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			Args: []string{
 				"sh", "-xe",
@@ -119,8 +119,8 @@ func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
-					Name:      v1.ConduitStorageVolumeMount,
-					MountPath: v1.ConduitVolumePath,
+					Name:      v1alpha.ConduitStorageVolumeMount,
+					MountPath: v1alpha.ConduitVolumePath,
 				},
 			},
 		})
@@ -134,19 +134,19 @@ func ConduitInitContainers(cc []*v1.ConduitConnector) []corev1.Container {
 func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) corev1.Container {
 	args := []string{
 		"/app/conduit",
-		"-pipelines.path", v1.ConduitPipelineFile,
-		"-connectors.path", v1.ConduitConnectorsPath,
+		"-pipelines.path", v1alpha.ConduitPipelineFile,
+		"-connectors.path", v1alpha.ConduitConnectorsPath,
 		"-db.type", "badger",
-		"-db.badger.path", v1.ConduitDBPath,
+		"-db.badger.path", v1alpha.ConduitDBPath,
 		"-pipelines.exit-on-error",
 	}
 
 	if withProcessors(version) {
-		args = append(args, "-processors.path", v1.ConduitProcessorsPath)
+		args = append(args, "-processors.path", v1alpha.ConduitProcessorsPath)
 	}
 
 	return corev1.Container{
-		Name:            v1.ConduitContainerName,
+		Name:            v1alpha.ConduitContainerName,
 		Image:           fmt.Sprint(image, ":", version),
 		ImagePullPolicy: corev1.PullAlways,
 		Args:            args,
@@ -177,12 +177,12 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) cor
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
-				Name:      v1.ConduitStorageVolumeMount,
-				MountPath: v1.ConduitVolumePath,
+				Name:      v1alpha.ConduitStorageVolumeMount,
+				MountPath: v1alpha.ConduitVolumePath,
 			},
 			{
-				Name:      v1.ConduitPipelineVolumeMount,
-				MountPath: v1.ConduitPipelinePath,
+				Name:      v1alpha.ConduitPipelineVolumeMount,
+				MountPath: v1alpha.ConduitPipelinePath,
 				ReadOnly:  true,
 			},
 		},

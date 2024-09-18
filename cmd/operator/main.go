@@ -18,7 +18,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -30,7 +30,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(v1.AddToScheme(scheme))
+	utilruntime.Must(v1alpha.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -87,7 +87,7 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		fatal(err, "unable to create controller", "controller", "Conduit")
 	}
-	if err = (&v1.Conduit{}).SetupWebhookWithManager(mgr); err != nil {
+	if err = (&v1alpha.Conduit{}).SetupWebhookWithManager(mgr); err != nil {
 		fatal(err, "unable to create webhook", "webhook", "Conduit")
 	}
 	//+kubebuilder:scaffold:builder
@@ -110,8 +110,8 @@ func fatal(err error, msg string, kv ...any) {
 	os.Exit(1)
 }
 
-func readMetadata(file string) (*v1.ConduitInstanceMetadata, error) {
-	c := v1.ConduitInstanceMetadata{
+func readMetadata(file string) (*v1alpha.ConduitInstanceMetadata, error) {
+	c := v1alpha.ConduitInstanceMetadata{
 		PodAnnotations: make(map[string]string),
 		Labels:         make(map[string]string),
 	}

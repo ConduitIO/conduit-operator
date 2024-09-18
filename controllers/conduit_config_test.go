@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
@@ -49,7 +49,7 @@ func Test_EnvVars(t *testing.T) {
 func Test_PipelineConfigYAML(t *testing.T) {
 	tests := []struct {
 		name    string
-		conduit *v1.Conduit
+		conduit *v1alpha.Conduit
 		want    string
 	}{
 		{

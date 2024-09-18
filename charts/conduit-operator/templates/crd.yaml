@@ -25,7 +25,7 @@ spec:
     singular: conduit
   scope: Namespaced
   versions:
-  - name: v1
+  - name: v1alpha
     schema:
       openAPIV3Schema:
         description: Conduit is the Schema for the conduits API

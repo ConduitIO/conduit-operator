@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	v1 "github.com/conduitio/conduit-operator/api/v1"
+	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
@@ -26,13 +26,13 @@ func Test_ConduitInitContainers(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		connectors []*v1.ConduitConnector
+		connectors []*v1alpha.ConduitConnector
 		imageVer   string
 		want       []corev1.Container
 	}{
 		{
 			name: "only builtin connectors",
-			connectors: []*v1.ConduitConnector{
+			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
 					PluginVersion: "latest",
@@ -42,7 +42,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 		},
 		{
 			name: "with latest standalone connector",
-			connectors: []*v1.ConduitConnector{
+			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
 					PluginVersion: "latest",
@@ -74,7 +74,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 		},
 		{
 			name: "with version standalone connector",
-			connectors: []*v1.ConduitConnector{
+			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
 					PluginVersion: "latest",
@@ -106,7 +106,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 		},
 		{
 			name: "with multiple standalone connector",
-			connectors: []*v1.ConduitConnector{
+			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
 					PluginVersion: "latest",
@@ -143,7 +143,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 		},
 		{
 			name: "with duplicate standalone connector",
-			connectors: []*v1.ConduitConnector{
+			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
 					PluginVersion: "latest",
