@@ -1,18 +1,32 @@
 package v1alpha
 
 import (
+	"fmt"
+
 	"github.com/conduitio/conduit-operator/pkg/conduit"
 )
 
 var connectorValidators = []func(*ConduitConnector) error{
-	ValidatePlugin,
-	ValidatePluginType,
+	validateConnectorPlugin,
+	validateConnectorPluginType,
 }
 
-func ValidatePlugin(c *ConduitConnector) error {
+var processorValidators = []func(*ConduitProcessor) error{
+	validateProcessorPlugin,
+}
+
+func validateConnectorPlugin(c *ConduitConnector) error {
 	return conduit.ValidatePlugin(c.Plugin)
 }
 
-func ValidatePluginType(c *ConduitConnector) error {
+func validateConnectorPluginType(c *ConduitConnector) error {
 	return conduit.ValidatePluginType(c.Type)
+}
+
+func validateProcessorPlugin(p *ConduitProcessor) error {
+	if p.Plugin == "" {
+		return fmt.Errorf("plugin %q is invalid", p.Plugin)
+	}
+
+	return nil
 }

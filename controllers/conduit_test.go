@@ -33,8 +33,10 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 
 	c.Spec.Processors = []*v1alpha.ConduitProcessor{
 		{
-			Name: "proc1",
-			Type: "yaml",
+			Name:      "proc1",
+			Plugin:    "builtin:base64.encode",
+			Workers:   2,
+			Condition: "{{ eq .Metadata.key \"pipeline\" }}",
 			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting101",
@@ -60,8 +62,10 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	// source
 	c.Spec.Connectors[0].Processors = []*v1alpha.ConduitProcessor{
 		{
-			Name: "proc1src",
-			Type: "js",
+			Name:      "proc1src",
+			Plugin:    "builtin:base64.decode",
+			Workers:   1,
+			Condition: "{{ eq .Metadata.key \"source\" }}",
 			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting0",
@@ -83,8 +87,10 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	// dest
 	c.Spec.Connectors[1].Processors = []*v1alpha.ConduitProcessor{
 		{
-			Name: "proc1dest",
-			Type: "js",
+			Name:      "proc1dest",
+			Plugin:    "builtin:error",
+			Workers:   3,
+			Condition: "{{ eq .Metadata.key \"dest\" }}",
 			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting0",
