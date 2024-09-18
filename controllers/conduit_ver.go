@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
 )
 
 func init() {

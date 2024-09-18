@@ -8,8 +8,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
-	ctrls "github.com/conduitio-labs/conduit-operator/controllers"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
+	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
 func Test_ConduitInitContainers(t *testing.T) {

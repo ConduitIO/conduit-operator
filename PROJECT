@@ -2,7 +2,7 @@ domain: conduit.io
 layout:
 - go.kubebuilder.io/v3
 projectName: conduit-operator
-repo: github.com/conduitio-labs/conduit-operator
+repo: github.com/conduitio/conduit-operator
 resources:
 - api:
     crdVersion: v1
@@ -11,7 +11,7 @@ resources:
   domain: conduit.io
   group: operator
   kind: Conduit
-  path: github.com/conduitio-labs/conduit-operator/api/v1
+  path: github.com/conduitio/conduit-operator/api/v1
   version: v1
   webhooks:
     defaulting: true

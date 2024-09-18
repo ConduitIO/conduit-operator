@@ -9,7 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
 )
 
 func compareStatusConditions(want, got v1.Conditions) string {

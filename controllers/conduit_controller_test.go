@@ -24,9 +24,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
-	"github.com/conduitio-labs/conduit-operator/controllers"
-	"github.com/conduitio-labs/conduit-operator/controllers/mock"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
+	"github.com/conduitio/conduit-operator/controllers"
+	"github.com/conduitio/conduit-operator/controllers/mock"
 )
 
 var (

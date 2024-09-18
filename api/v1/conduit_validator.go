@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/conduitio-labs/conduit-operator/pkg/conduit"
+	"github.com/conduitio/conduit-operator/pkg/conduit"
 )
 
 var connectorValidators = []func(*ConduitConnector) error{

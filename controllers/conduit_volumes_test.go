@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 
-	v1 "github.com/conduitio-labs/conduit-operator/api/v1"
-	ctrls "github.com/conduitio-labs/conduit-operator/controllers"
+	v1 "github.com/conduitio/conduit-operator/api/v1"
+	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
 func Test_ConduitVolumeClaim(t *testing.T) {
