@@ -82,9 +82,10 @@ type ConduitConnector struct {
 }
 
 type ConduitProcessor struct {
-	Name    string `json:"name,omitempty"`
-	Type    string `json:"type,omitempty"`
-	Workers int    `json:"workers,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Plugin    string `json:"plugin,omitempty"`
+	Condition string `json:"condition,omitempty"`
+	Workers   int    `json:"workers,omitempty"`
 
 	Settings []SettingsVar `json:"settings,omitempty"`
 }

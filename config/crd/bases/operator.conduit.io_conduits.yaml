@@ -55,7 +55,11 @@ spec:
                     processors:
                       items:
                         properties:
+                          condition:
+                            type: string
                           name:
+                            type: string
+                          plugin:
                             type: string
                           settings:
                             items:
@@ -100,8 +104,6 @@ spec:
                                   type: string
                               type: object
                             type: array
-                          type:
-                            type: string
                           workers:
                             type: integer
                         type: object
@@ -161,7 +163,11 @@ spec:
               processors:
                 items:
                   properties:
+                    condition:
+                      type: string
                     name:
+                      type: string
+                    plugin:
                       type: string
                     settings:
                       items:
@@ -205,8 +211,6 @@ spec:
                             type: string
                         type: object
                       type: array
-                    type:
-                      type: string
                     workers:
                       type: integer
                   type: object

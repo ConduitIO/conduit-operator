@@ -14,7 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const pipelineConfigVersion = "2.0"
+const pipelineConfigVersion = "2.2"
 
 // PipelineConfigYAML produces a conduit pipeline configuration in YAML.
 // Invalid configuration will result in a marshalling error.
@@ -180,8 +180,10 @@ func processorConfig(ctx context.Context, cl client.Client, p *v1alpha.ConduitPr
 	}
 
 	return cyaml.Processor{
-		ID:       p.Name,
-		Type:     p.Type,
-		Settings: settings,
+		ID:        p.Name,
+		Plugin:    p.Plugin,
+		Condition: p.Condition,
+		Workers:   p.Workers,
+		Settings:  settings,
 	}, nil
 }
