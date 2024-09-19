@@ -19,7 +19,7 @@ func (r *Conduit) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-operator-conduit-io-v1-conduit,mutating=true,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1,name=mconduit.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-operator-conduit-io-v1alpha-conduit,mutating=true,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1alpha,name=mconduit.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Conduit{}
 
@@ -66,7 +66,7 @@ func (r *Conduit) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-operator-conduit-io-v1-conduit,mutating=false,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1,name=vconduit.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-operator-conduit-io-v1alpha-conduit,mutating=false,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1alpha,name=vconduit.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Conduit{}
 

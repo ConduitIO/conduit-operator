@@ -25,7 +25,7 @@ func validateConnectorPluginType(c *ConduitConnector) error {
 
 func validateProcessorPlugin(p *ConduitProcessor) error {
 	if p.Plugin == "" {
-		return fmt.Errorf("plugin %q is invalid", p.Plugin)
+		return fmt.Errorf("plugin cannot be empty")
 	}
 
 	return nil
