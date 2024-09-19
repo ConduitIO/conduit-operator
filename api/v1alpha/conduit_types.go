@@ -59,6 +59,7 @@ var (
 
 // ConduitSpec defines the desired state of Conduit
 type ConduitSpec struct {
+	ID          string `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 	Image       string `json:"image,omitempty"`
@@ -70,6 +71,7 @@ type ConduitSpec struct {
 }
 
 type ConduitConnector struct {
+	ID            string `json:"id,omitempty"`
 	Name          string `json:"name,omitempty"`
 	Type          string `json:"type,omitempty"`
 	Plugin        string `json:"plugin,omitempty"`
@@ -82,6 +84,7 @@ type ConduitConnector struct {
 }
 
 type ConduitProcessor struct {
+	ID        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Plugin    string `json:"plugin,omitempty"`
 	Condition string `json:"condition,omitempty"`

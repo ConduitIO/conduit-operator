@@ -301,10 +301,18 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		deployment.Spec.Template.ObjectMeta.Annotations = annotations
 
 		status := deployment.Status
-		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, status.Replicas)
+		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, spec.Replicas)
 
-		switch {
-		case status.UnavailableReplicas == 0:
+		var availableCond appsv1.DeploymentCondition
+		for i, c := range status.Conditions {
+			if c.Type == appsv1.DeploymentAvailable {
+				availableCond = status.Conditions[i]
+				break
+			}
+		}
+
+		switch availableCond.Status {
+		case corev1.ConditionTrue:
 			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, corev1.ConditionTrue) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.RunningReason, "Conduit deployment %q running, config %q", nn, cm.ResourceVersion)
 			}
@@ -423,7 +431,6 @@ func (r *ConduitReconciler) UpdateStatus(ctx context.Context, c *v1.Conduit) err
 	//       It will be useful to expose these conditions:
 	//       * Init container responsible for building connectors on bootup
 	//       * Conduit server pod running or failing, etc.
-
 	if !equality.Semantic.DeepEqual(latestConduit.Status, c.Status) {
 		now := metav1.Now()
 		c.Status.UpdatedAt = &now

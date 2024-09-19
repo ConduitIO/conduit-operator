@@ -109,11 +109,14 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 		},
 	}
 
+	// apply defaults as they would
+	c.Default()
+
 	return c
 }
 
 func sampleConduit(running bool) *v1alpha.Conduit {
-	return &v1alpha.Conduit{
+	c := &v1alpha.Conduit{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sample",
 			Namespace: "sample",
@@ -124,9 +127,9 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 			Description: "my-description",
 			Connectors: []*v1alpha.ConduitConnector{
 				{
-					Name:       "source-connector",
-					Type:       "source",
-					PluginName: "standalone:generator",
+					Name:   "source-connector",
+					Type:   "source",
+					Plugin: "standalone:generator",
 					Settings: []v1alpha.SettingsVar{
 						{
 							Name:  "setting1",
@@ -148,9 +151,9 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 					},
 				},
 				{
-					Name:       "destination-connector",
-					Type:       "destination",
-					PluginName: "builtin:file",
+					Name:   "destination-connector",
+					Type:   "destination",
+					Plugin: "builtin:file",
 					Settings: []v1alpha.SettingsVar{
 						{
 							Name: "setting2",
@@ -166,4 +169,9 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 			},
 		},
 	}
+
+	// apply defaults as they would
+	c.Default()
+
+	return c
 }

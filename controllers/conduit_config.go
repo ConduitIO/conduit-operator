@@ -32,7 +32,7 @@ func PipelineConfigYAML(ctx context.Context, client client.Client, conduit *v1al
 		Version: pipelineConfigVersion,
 		Pipelines: []cyaml.Pipeline{
 			{
-				ID:          spec.Name,
+				ID:          spec.ID,
 				Name:        spec.Name,
 				Description: spec.Description,
 				Status:      pipelineStatus,
@@ -164,7 +164,7 @@ func connectorConfig(ctx context.Context, cl client.Client, c *v1alpha.ConduitCo
 	}
 
 	return cyaml.Connector{
-		ID:         c.Name,
+		ID:         c.ID,
 		Name:       c.Name,
 		Plugin:     c.PluginName,
 		Type:       c.Type,
@@ -180,7 +180,7 @@ func processorConfig(ctx context.Context, cl client.Client, p *v1alpha.ConduitPr
 	}
 
 	return cyaml.Processor{
-		ID:        p.Name,
+		ID:        p.ID,
 		Plugin:    p.Plugin,
 		Condition: p.Condition,
 		Workers:   p.Workers,
