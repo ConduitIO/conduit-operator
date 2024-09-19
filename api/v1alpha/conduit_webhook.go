@@ -62,11 +62,6 @@ func (r *Conduit) Default() {
 			continue
 		}
 
-		if strings.HasPrefix(c.Plugin, "standalone:") {
-			c.PluginName = c.Plugin
-			continue
-		}
-
 		if c.PluginVersion == "" {
 			c.PluginVersion = "latest"
 		}

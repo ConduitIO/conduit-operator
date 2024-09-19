@@ -129,7 +129,7 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 				{
 					Name:   "source-connector",
 					Type:   "source",
-					Plugin: "standalone:generator",
+					Plugin: "builtin:generator",
 					Settings: []v1alpha.SettingsVar{
 						{
 							Name:  "setting1",
