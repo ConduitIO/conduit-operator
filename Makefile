@@ -10,7 +10,7 @@ CERT_MANAGER      := https://github.com/cert-manager/cert-manager/releases/downl
 # KUSTOMIZE_VERSION ?= v4.5.7
 KUSTOMIZE_VERSION ?= v5.4.3
 CTRL_GEN_VERSION  ?= v0.16.3
-KIND_VERSION      ?= v0.22.0
+KIND_VERSION      ?= v0.24.0
 GOLINT_VERSION    ?= v1.61.0
 
 .EXPORT_ALL_VARIABLES:
@@ -84,6 +84,10 @@ manifests: bin/kustomize generate
 	# kustomize build config/manager > charts/conduit-operator/templates/deployment.yaml
 	kustomize build config/certmanager > charts/conduit-operator/templates/certificate.yaml
 	kustomize build config/webhook > charts/conduit-operator/templates/webhook.yaml
+
+.PHONY: install
+install: manifests bin/kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	kustomize build config/crd | kubectl apply -f -
 
 .PHONY: crds
 crds: bin/controller-gen

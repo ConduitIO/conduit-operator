@@ -231,9 +231,9 @@ func (r *ConduitReconciler) CreateOrUpdateVolume(ctx context.Context, c *v1.Cond
 // Status conditions are set depending on the outcome of the operation.
 func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.Conduit) error {
 	var (
-		cm         = corev1.ConfigMap{}
-		nn         = c.NamespacedName()
-		oneReplica = int32(1)
+		cm       = corev1.ConfigMap{}
+		nn       = c.NamespacedName()
+		replicas = r.getReplicas(c)
 
 		deployment = appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
@@ -271,7 +271,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
 			},
-			Replicas: &oneReplica,
+			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
@@ -455,4 +455,11 @@ func (r *ConduitReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Owns(&corev1.PersistentVolumeClaim{}).
 		// Owns(&corev1.PersistentVolume{}).
 		Complete(r)
+}
+
+func (r *ConduitReconciler) getReplicas(c *v1.Conduit) int32 {
+	if c.Spec.Running {
+		return 1
+	}
+	return 0
 }

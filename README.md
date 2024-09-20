@@ -75,7 +75,7 @@ spec:
    
 3. Deploy a sample pipeline configuration
    ```shell
-   kubectl apply -f samples/conf/conduit-generator.yaml
+   kubectl apply -f config/samples/conduit-generator.yaml
    ```
 
 4. Wait for instance to become ready
