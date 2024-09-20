@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"runtime"
 	"time"
+	"slices"
 
 	"golang.org/x/exp/maps"
 
@@ -303,39 +304,33 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		status := deployment.Status
 		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, *spec.Replicas)
 
-		var availableCond appsv1.DeploymentCondition
-		for i, c := range status.Conditions {
-			if c.Type == appsv1.DeploymentAvailable {
-				availableCond = status.Conditions[i]
-				break
-			}
-		}
+		runningStatus := r.deploymentRunningStatus(&deployment)
 
-		switch status := availableCond.Status; status {
+		switch runningStatus {
 		case corev1.ConditionTrue:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.RunningReason, "Conduit deployment %q running, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
-				status,
+				runningStatus,
 				"DeploymentReady",
 				readyReplicas,
 			)
 		case corev1.ConditionFalse:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.StoppedReason, "Conduit deployment %q stopped, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
-				status,
+				runningStatus,
 				"DeploymentReady",
 				readyReplicas,
 			)
 		default:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
 			}
 		}
@@ -469,10 +464,26 @@ func (r *ConduitReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ConduitReconciler) getReplicas(c *v1.Conduit) int32 {
-	// safe to de-reference because the Defaulter in conduit_webhook
-	// sets the default value if it's provided in the CRD
-	if *c.Spec.Running {
+	if c.Spec.Running != nil && *c.Spec.Running {
 		return 1
 	}
 	return 0
+}
+
+
+func (r *ConduitReconciler) deploymentRunningStatus(d *appsv1.Deployment) corev1.ConditionStatus {
+	// When the deployment is scaled down, return not running (false)
+	if *d.Spec.Replicas == 0 {
+		return corev1.ConditionFalse
+	}
+
+	i := slices.IndexFunc(d.Status.Conditions, func(c appsv1.DeploymentCondition) bool {
+		return c.Type == appsv1.DeploymentAvailable
+	})
+	if i < 0 {
+		r.Logger.Info("failed to find deployment status condition, default to unknown", "deployment", d.Name)
+		return corev1.ConditionUnknown
+	}
+
+	return d.Status.Conditions[i].Status
 }
