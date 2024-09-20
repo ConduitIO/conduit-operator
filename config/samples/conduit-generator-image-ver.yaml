@@ -3,7 +3,7 @@ kind: Conduit
 metadata:
   name: conduit-generator-image-ver
 spec:
-  running: false
+  running: true
   name: generator.log
   description: generator pipeline
   image: ghcr.io/conduitio/conduit
