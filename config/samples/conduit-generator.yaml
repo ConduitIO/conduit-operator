@@ -2,7 +2,6 @@ apiVersion: operator.conduit.io/v1alpha
 kind: Conduit
 metadata:
   name: conduit-generator
-  namespace: default
 spec:
   running: true
   name: generator.log
