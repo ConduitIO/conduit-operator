@@ -22,6 +22,7 @@ const (
 	S3Plugin        = "builtin:s3"
 	PostgresPlugin  = "builtin:postgres"
 	LogPlugin       = "builtin:log"
+	FilePlugin      = "builtin:file"
 
 	sourceConnector = "source"
 	destConnector   = "destination"
@@ -39,7 +40,8 @@ func ValidatePlugin(name string) error {
 		GeneratorPlugin,
 		S3Plugin,
 		PostgresPlugin,
-		LogPlugin:
+		LogPlugin,
+		FilePlugin:
 
 		return nil
 	}

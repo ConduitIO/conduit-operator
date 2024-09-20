@@ -24,7 +24,7 @@ func PipelineConfigYAML(ctx context.Context, client client.Client, conduit *v1al
 		pipelineStatus = "stopped"
 	)
 
-	if conduit.Spec.Running {
+	if *conduit.Spec.Running {
 		pipelineStatus = "running"
 	}
 

@@ -32,6 +32,11 @@ func (r *Conduit) Default() {
 		}
 	}
 
+	if r.Spec.Running == nil {
+		r.Spec.Running = new(bool)
+		*r.Spec.Running = true
+	}
+
 	if r.Spec.Name == "" {
 		r.Spec.Name = r.ObjectMeta.Name
 	}

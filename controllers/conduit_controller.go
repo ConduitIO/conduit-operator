@@ -301,7 +301,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		deployment.Spec.Template.ObjectMeta.Annotations = annotations
 
 		status := deployment.Status
-		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, spec.Replicas)
+		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, *spec.Replicas)
 
 		var availableCond appsv1.DeploymentCondition
 		for i, c := range status.Conditions {
@@ -311,29 +311,33 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 			}
 		}
 
-		switch availableCond.Status {
+		switch status := availableCond.Status; status {
 		case corev1.ConditionTrue:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, corev1.ConditionTrue) {
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.RunningReason, "Conduit deployment %q running, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
-				corev1.ConditionTrue,
+				status,
 				"DeploymentReady",
 				readyReplicas,
 			)
-		default:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, corev1.ConditionFalse) {
-				r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
+		case corev1.ConditionFalse:
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
+				r.Eventf(c, corev1.EventTypeNormal, v1.StoppedReason, "Conduit deployment %q stopped, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
-				corev1.ConditionFalse,
-				"DeploymentPending",
+				status,
+				"DeploymentReady",
 				readyReplicas,
 			)
+		case corev1.ConditionUnknown:
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
+				r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
+			}
 		}
 
 		return ctrlutil.SetControllerReference(c, &deployment, r.Scheme())
