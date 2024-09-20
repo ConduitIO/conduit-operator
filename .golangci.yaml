@@ -1,11 +1,14 @@
 run:
   timeout: 3m
-  skip-dirs:
+  modules-download-mode: readonly
+
+issues:
+  exclude-dirs-use-default: false
+  exclude-dirs:
     - "vendor"
     - "config"
     - "bin"
     - "charts"
-  modules-download-mode: readonly
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -15,6 +18,7 @@ linters:
     # We plan to enable all of the linters which are commented out.
     # However, we want to enable them one by one (so we don't have to fix many issues at once).
     - bodyclose
+    - copyloopvar
     # - depguard
     - dogsled
     - durationcheck
@@ -23,7 +27,6 @@ linters:
     # - errorlint
     # - exhaustive
     # - exhaustivestruct
-    - exportloopref
     # - forbidigo
     # - forcetypeassert
     # - funlen

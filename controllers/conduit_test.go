@@ -122,7 +122,7 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 			Namespace: "sample",
 		},
 		Spec: v1alpha.ConduitSpec{
-			Running:     running,
+			Running:     &running,
 			Name:        "my-pipeline",
 			Description: "my-description",
 			Connectors: []*v1alpha.ConduitConnector{

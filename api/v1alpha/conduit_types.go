@@ -64,7 +64,7 @@ type ConduitSpec struct {
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 	Image       string `json:"image,omitempty"`
-	Running     *bool   `json:"running,omitempty"`
+	Running     *bool  `json:"running,omitempty"`
 	Version     string `json:"version,omitempty"`
 
 	Connectors []*ConduitConnector `json:"connectors,omitempty"`
