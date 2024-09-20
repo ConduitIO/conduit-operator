@@ -32,6 +32,19 @@ func (r *Conduit) Default() {
 		}
 	}
 
+	if r.Spec.Running == nil {
+		r.Spec.Running = new(bool)
+		*r.Spec.Running = true
+	}
+
+	if r.Spec.Name == "" {
+		r.Spec.Name = r.ObjectMeta.Name
+	}
+
+	if r.Spec.ID == "" {
+		r.Spec.ID = r.Spec.Name
+	}
+
 	if r.Spec.Image == "" {
 		r.Spec.Image = ConduitImage
 	}
@@ -41,6 +54,12 @@ func (r *Conduit) Default() {
 	}
 
 	for _, c := range r.Spec.Connectors {
+		if c.ID == "" {
+			c.ID = c.Name
+		}
+
+		r.proccessorDefaulter(c.Processors)
+
 		c.Plugin = strings.ToLower(c.Plugin)
 
 		if strings.HasPrefix(c.Plugin, "builtin:") {
@@ -58,9 +77,18 @@ func (r *Conduit) Default() {
 		c.PluginName = fmt.Sprintf("standalone:%s", pluginName)
 	}
 
-	for _, p := range r.Spec.Processors {
+	r.proccessorDefaulter(r.Spec.Processors)
+}
+
+// processorDefaulter adds defaults for processor variables which have not been specified.
+func (*Conduit) proccessorDefaulter(pp []*ConduitProcessor) {
+	for _, p := range pp {
 		if p.Workers == 0 {
 			p.Workers = 1
+		}
+
+		if p.ID == "" {
+			p.ID = p.Name
 		}
 	}
 }

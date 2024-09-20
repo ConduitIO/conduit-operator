@@ -24,6 +24,7 @@ const (
 	CreatedReason  = "Created"
 	UpdatedReason  = "Updated"
 	RunningReason  = "Running"
+	StoppedReason  = "Stopped"
 	PendingReason  = "Pending"
 	VolBoundReason = "VolumeBound"
 	DeletedReason  = "Deleted"
@@ -59,10 +60,11 @@ var (
 
 // ConduitSpec defines the desired state of Conduit
 type ConduitSpec struct {
+	ID          string `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 	Image       string `json:"image,omitempty"`
-	Running     bool   `json:"running,omitempty"`
+	Running     *bool  `json:"running,omitempty"`
 	Version     string `json:"version,omitempty"`
 
 	Connectors []*ConduitConnector `json:"connectors,omitempty"`
@@ -70,6 +72,7 @@ type ConduitSpec struct {
 }
 
 type ConduitConnector struct {
+	ID            string `json:"id,omitempty"`
 	Name          string `json:"name,omitempty"`
 	Type          string `json:"type,omitempty"`
 	Plugin        string `json:"plugin,omitempty"`
@@ -82,6 +85,7 @@ type ConduitConnector struct {
 }
 
 type ConduitProcessor struct {
+	ID        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Plugin    string `json:"plugin,omitempty"`
 	Condition string `json:"condition,omitempty"`

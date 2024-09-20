@@ -42,6 +42,8 @@ spec:
               connectors:
                 items:
                   properties:
+                    id:
+                      type: string
                     name:
                       type: string
                     plugin:
@@ -56,6 +58,8 @@ spec:
                       items:
                         properties:
                           condition:
+                            type: string
+                          id:
                             type: string
                           name:
                             type: string
@@ -156,6 +160,8 @@ spec:
                 type: array
               description:
                 type: string
+              id:
+                type: string
               image:
                 type: string
               name:
@@ -164,6 +170,8 @@ spec:
                 items:
                   properties:
                     condition:
+                      type: string
+                    id:
                       type: string
                     name:
                       type: string
