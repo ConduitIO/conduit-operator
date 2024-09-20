@@ -663,7 +663,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 			conduit: sampleConduit(true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
-				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionFalse, "", "")
+				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
 				status.SetCondition(v1alpha.ConditionConduitReady, corev1.ConditionFalse, "", "")
 
 				return status
@@ -792,8 +792,18 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 						return nil
 					})
 				client.EXPECT().Get(ctx, nn, deployment).
-					DoAndReturn(func(_ context.Context, _ types.NamespacedName, d *appsv1.Deployment, _ ...kclient.CreateOption) error {
-						d.Status.UnavailableReplicas = 1
+					DoAndReturn(func(_ context.Context, n types.NamespacedName, d *appsv1.Deployment, _ ...kclient.CreateOption) error {
+						is.Equal(n, nn)
+
+						d.Status = appsv1.DeploymentStatus{
+							Conditions: []appsv1.DeploymentCondition{
+								{
+									Type:   appsv1.DeploymentAvailable,
+									Status: corev1.ConditionFalse,
+								},
+							},
+						}
+
 						return nil
 					})
 
@@ -805,7 +815,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				client.EXPECT().Update(ctx, mock.NewDeploymentMatcher(updatedDeployment)).Return(nil)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
-				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.PendingReason, gomock.Any(), nn)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.StoppedReason, gomock.Any(), nn)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
 				return &controllers.ConduitReconciler{

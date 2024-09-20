@@ -334,7 +334,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 				"DeploymentReady",
 				readyReplicas,
 			)
-		case corev1.ConditionUnknown:
+		default:
 			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
 			}
