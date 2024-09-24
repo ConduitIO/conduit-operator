@@ -33,8 +33,10 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 
 	c.Spec.Processors = []*v1alpha.ConduitProcessor{
 		{
-			Name: "proc1",
-			Type: "yaml",
+			Name:      "proc1",
+			Plugin:    "builtin:base64.encode",
+			Workers:   2,
+			Condition: "{{ eq .Metadata.key \"pipeline\" }}",
 			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting101",
@@ -60,8 +62,10 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	// source
 	c.Spec.Connectors[0].Processors = []*v1alpha.ConduitProcessor{
 		{
-			Name: "proc1src",
-			Type: "js",
+			Name:      "proc1src",
+			Plugin:    "builtin:base64.decode",
+			Workers:   1,
+			Condition: "{{ eq .Metadata.key \"source\" }}",
 			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting0",
@@ -83,8 +87,10 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	// dest
 	c.Spec.Connectors[1].Processors = []*v1alpha.ConduitProcessor{
 		{
-			Name: "proc1dest",
-			Type: "js",
+			Name:      "proc1dest",
+			Plugin:    "builtin:error",
+			Workers:   3,
+			Condition: "{{ eq .Metadata.key \"dest\" }}",
 			Settings: []v1alpha.SettingsVar{
 				{
 					Name: "setting0",
@@ -103,24 +109,27 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 		},
 	}
 
+	// apply defaults as they would
+	c.Default()
+
 	return c
 }
 
 func sampleConduit(running bool) *v1alpha.Conduit {
-	return &v1alpha.Conduit{
+	c := &v1alpha.Conduit{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sample",
 			Namespace: "sample",
 		},
 		Spec: v1alpha.ConduitSpec{
-			Running:     running,
+			Running:     &running,
 			Name:        "my-pipeline",
 			Description: "my-description",
 			Connectors: []*v1alpha.ConduitConnector{
 				{
-					Name:       "source-connector",
-					Type:       "source",
-					PluginName: "standalone:generator",
+					Name:   "source-connector",
+					Type:   "source",
+					Plugin: "builtin:generator",
 					Settings: []v1alpha.SettingsVar{
 						{
 							Name:  "setting1",
@@ -142,9 +151,9 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 					},
 				},
 				{
-					Name:       "destination-connector",
-					Type:       "destination",
-					PluginName: "builtin:file",
+					Name:   "destination-connector",
+					Type:   "destination",
+					Plugin: "builtin:file",
 					Settings: []v1alpha.SettingsVar{
 						{
 							Name: "setting2",
@@ -160,4 +169,9 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 			},
 		},
 	}
+
+	// apply defaults as they would
+	c.Default()
+
+	return c
 }

@@ -14,7 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const pipelineConfigVersion = "2.0"
+const pipelineConfigVersion = "2.2"
 
 // PipelineConfigYAML produces a conduit pipeline configuration in YAML.
 // Invalid configuration will result in a marshalling error.
@@ -24,7 +24,7 @@ func PipelineConfigYAML(ctx context.Context, client client.Client, conduit *v1al
 		pipelineStatus = "stopped"
 	)
 
-	if conduit.Spec.Running {
+	if *conduit.Spec.Running {
 		pipelineStatus = "running"
 	}
 
@@ -32,7 +32,7 @@ func PipelineConfigYAML(ctx context.Context, client client.Client, conduit *v1al
 		Version: pipelineConfigVersion,
 		Pipelines: []cyaml.Pipeline{
 			{
-				ID:          spec.Name,
+				ID:          spec.ID,
 				Name:        spec.Name,
 				Description: spec.Description,
 				Status:      pipelineStatus,
@@ -164,7 +164,7 @@ func connectorConfig(ctx context.Context, cl client.Client, c *v1alpha.ConduitCo
 	}
 
 	return cyaml.Connector{
-		ID:         c.Name,
+		ID:         c.ID,
 		Name:       c.Name,
 		Plugin:     c.PluginName,
 		Type:       c.Type,
@@ -180,8 +180,10 @@ func processorConfig(ctx context.Context, cl client.Client, p *v1alpha.ConduitPr
 	}
 
 	return cyaml.Processor{
-		ID:       p.Name,
-		Type:     p.Type,
-		Settings: settings,
+		ID:        p.ID,
+		Plugin:    p.Plugin,
+		Condition: p.Condition,
+		Workers:   p.Workers,
+		Settings:  settings,
 	}, nil
 }

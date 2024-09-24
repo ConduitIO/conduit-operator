@@ -19,7 +19,7 @@ func (r *Conduit) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-operator-conduit-io-v1-conduit,mutating=true,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1,name=mconduit.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-operator-conduit-io-v1alpha-conduit,mutating=true,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1alpha,name=mconduit.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Conduit{}
 
@@ -32,6 +32,19 @@ func (r *Conduit) Default() {
 		}
 	}
 
+	if r.Spec.Running == nil {
+		r.Spec.Running = new(bool)
+		*r.Spec.Running = true
+	}
+
+	if r.Spec.Name == "" {
+		r.Spec.Name = r.ObjectMeta.Name
+	}
+
+	if r.Spec.ID == "" {
+		r.Spec.ID = r.Spec.Name
+	}
+
 	if r.Spec.Image == "" {
 		r.Spec.Image = ConduitImage
 	}
@@ -41,6 +54,12 @@ func (r *Conduit) Default() {
 	}
 
 	for _, c := range r.Spec.Connectors {
+		if c.ID == "" {
+			c.ID = c.Name
+		}
+
+		r.proccessorDefaulter(c.Processors)
+
 		c.Plugin = strings.ToLower(c.Plugin)
 
 		if strings.HasPrefix(c.Plugin, "builtin:") {
@@ -57,17 +76,42 @@ func (r *Conduit) Default() {
 		c.PluginPkg = fmt.Sprintf("github.com/%s/cmd/connector@%s", c.Plugin, c.PluginVersion)
 		c.PluginName = fmt.Sprintf("standalone:%s", pluginName)
 	}
+
+	r.proccessorDefaulter(r.Spec.Processors)
+}
+
+// processorDefaulter adds defaults for processor variables which have not been specified.
+func (*Conduit) proccessorDefaulter(pp []*ConduitProcessor) {
+	for _, p := range pp {
+		if p.Workers == 0 {
+			p.Workers = 1
+		}
+
+		if p.ID == "" {
+			p.ID = p.Name
+		}
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-operator-conduit-io-v1-conduit,mutating=false,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1,name=vconduit.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-operator-conduit-io-v1alpha-conduit,mutating=false,failurePolicy=fail,sideEffects=None,groups=operator.conduit.io,resources=conduits,verbs=create;update,versions=v1alpha,name=vconduit.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Conduit{}
 
 // ValidateCreate implements webhook.Validator for the Conduit resource.
 // Error is returned when the resource is invalid.
 func (r *Conduit) ValidateCreate() (admission.Warnings, error) {
-	return validateConnectors(r.Spec.Connectors)
+	var errs error
+
+	if _, err := validateConnectors(r.Spec.Connectors); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	if _, err := validateProcessors(r.Spec.Processors); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	return nil, errs
 }
 
 // ValidateUpdate implements webhook.Validator for the Conduit resource.
@@ -85,18 +129,39 @@ func (r *Conduit) ValidateDelete() (admission.Warnings, error) {
 // validateConnectors validates the attributes of connectors in the slice.
 // Error is return when the validation fails.
 func validateConnectors(cc []*ConduitConnector) (admission.Warnings, error) {
-	var errors error
+	var errs error
 
 	for _, c := range cc {
-		for _, v := range connectorValidators {
-			if err := v(c); err != nil {
-				errors = multierror.Append(
-					errors,
+		for _, fn := range connectorValidators {
+			if err := fn(c); err != nil {
+				errs = multierror.Append(
+					errs,
 					fmt.Errorf("connector validation failure %q: %w", c.Name, err),
+				)
+			}
+		}
+
+		if _, err := validateProcessors(c.Processors); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+
+	return nil, errs
+}
+
+func validateProcessors(pp []*ConduitProcessor) (admission.Warnings, error) {
+	var errs error
+
+	for _, p := range pp {
+		for _, fn := range processorValidators {
+			if err := fn(p); err != nil {
+				errs = multierror.Append(
+					errs,
+					fmt.Errorf("processor validation failure %q: %w", p.Name, err),
 				)
 			}
 		}
 	}
 
-	return nil, errors
+	return nil, errs
 }

@@ -42,6 +42,8 @@ spec:
               connectors:
                 items:
                   properties:
+                    id:
+                      type: string
                     name:
                       type: string
                     plugin:
@@ -55,7 +57,13 @@ spec:
                     processors:
                       items:
                         properties:
+                          condition:
+                            type: string
+                          id:
+                            type: string
                           name:
+                            type: string
+                          plugin:
                             type: string
                           settings:
                             items:
@@ -100,8 +108,6 @@ spec:
                                   type: string
                               type: object
                             type: array
-                          type:
-                            type: string
                           workers:
                             type: integer
                         type: object
@@ -154,6 +160,8 @@ spec:
                 type: array
               description:
                 type: string
+              id:
+                type: string
               image:
                 type: string
               name:
@@ -161,7 +169,13 @@ spec:
               processors:
                 items:
                   properties:
+                    condition:
+                      type: string
+                    id:
+                      type: string
                     name:
+                      type: string
+                    plugin:
                       type: string
                     settings:
                       items:
@@ -205,8 +219,6 @@ spec:
                             type: string
                         type: object
                       type: array
-                    type:
-                      type: string
                     workers:
                       type: integer
                   type: object
