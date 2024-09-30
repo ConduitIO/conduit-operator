@@ -85,10 +85,6 @@ manifests: bin/kustomize generate
 	kustomize build config/certmanager > charts/conduit-operator/templates/certificate.yaml
 	kustomize build config/webhook > charts/conduit-operator/templates/webhook.yaml
 
-.PHONY: install
-install: manifests bin/kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	kustomize build config/crd | kubectl apply -f -
-
 .PHONY: crds
 crds: bin/controller-gen
 	controller-gen object:headerFile="hack/boilerplate.go.txt" paths="./..."
