@@ -469,7 +469,9 @@ func (r *ConduitReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ConduitReconciler) getReplicas(c *v1.Conduit) int32 {
-	if c.Spec.Running {
+	// safe to de-reference because the Defaulter in conduit_webhook
+	// sets the default value if it's provided in the CRD
+	if *c.Spec.Running {
 		return 1
 	}
 	return 0
