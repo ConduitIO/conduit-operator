@@ -10,7 +10,7 @@ CERT_MANAGER      := https://github.com/cert-manager/cert-manager/releases/downl
 # KUSTOMIZE_VERSION ?= v4.5.7
 KUSTOMIZE_VERSION ?= v5.4.3
 CTRL_GEN_VERSION  ?= v0.16.3
-KIND_VERSION      ?= v0.22.0
+KIND_VERSION      ?= v0.24.0
 GOLINT_VERSION    ?= v1.61.0
 
 .EXPORT_ALL_VARIABLES:

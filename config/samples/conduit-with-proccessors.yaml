@@ -1,4 +1,4 @@
-apiVersion: operator.conduit.io/v1
+apiVersion: operator.conduit.io/v1alpha
 kind: Conduit
 metadata:
   name: conduit-with-procs
@@ -13,17 +13,25 @@ spec:
       settings:
         - name: format.type
           value: structured
-        - name: format.options
-          value: "id:int,name:string,company:string,password:string,trial:bool"
+        - name: format.options.id
+          value: "int"
+        - name: format.options.name
+          value: "string"
+        - name: format.options.company
+          value: "string"
+        - name: format.options.password
+          value: "string"
+        - name: format.options.trial
+          value: "bool"
         - name: recordCount
           value: "3"
       processors:
         - name: sourceproc
-          type: maskfieldpayload
+          plugin: field.set
           settings:
             - name: field
-              value: password
-            - name: replacement
+              value: .Payload.After.password
+            - name: value
               value: "[redacted]"
     - name: destination-connector
       type: destination

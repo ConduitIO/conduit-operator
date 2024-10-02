@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
+	"slices"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -231,9 +232,9 @@ func (r *ConduitReconciler) CreateOrUpdateVolume(ctx context.Context, c *v1.Cond
 // Status conditions are set depending on the outcome of the operation.
 func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.Conduit) error {
 	var (
-		cm         = corev1.ConfigMap{}
-		nn         = c.NamespacedName()
-		oneReplica = int32(1)
+		cm       = corev1.ConfigMap{}
+		nn       = c.NamespacedName()
+		replicas = r.getReplicas(c)
 
 		deployment = appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
@@ -271,7 +272,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
 			},
-			Replicas: &oneReplica,
+			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{},
@@ -303,41 +304,33 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		status := deployment.Status
 		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, *spec.Replicas)
 
-		var availableCond appsv1.DeploymentCondition
-		for i, c := range status.Conditions {
-			if c.Type == appsv1.DeploymentAvailable {
-				availableCond = status.Conditions[i]
-				break
-			}
-		}
+		runningStatus := r.deploymentRunningStatus(&deployment)
 
-		switch status := availableCond.Status; status {
+		switch runningStatus {
 		case corev1.ConditionTrue:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.RunningReason, "Conduit deployment %q running, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
-				status,
+				runningStatus,
 				"DeploymentReady",
 				readyReplicas,
 			)
 		case corev1.ConditionFalse:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
+			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
 				r.Eventf(c, corev1.EventTypeNormal, v1.StoppedReason, "Conduit deployment %q stopped, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
-				status,
+				runningStatus,
 				"DeploymentReady",
 				readyReplicas,
 			)
 		default:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, status) {
-				r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
-			}
+			r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
 		}
 
 		return ctrlutil.SetControllerReference(c, &deployment, r.Scheme())
@@ -466,4 +459,28 @@ func (r *ConduitReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Owns(&corev1.PersistentVolumeClaim{}).
 		// Owns(&corev1.PersistentVolume{}).
 		Complete(r)
+}
+
+func (r *ConduitReconciler) getReplicas(c *v1.Conduit) int32 {
+	if c.Spec.Running != nil && *c.Spec.Running {
+		return 1
+	}
+	return 0
+}
+
+func (r *ConduitReconciler) deploymentRunningStatus(d *appsv1.Deployment) corev1.ConditionStatus {
+	// When the deployment is scaled down, return not running (false)
+	if *d.Spec.Replicas == 0 {
+		return corev1.ConditionFalse
+	}
+
+	i := slices.IndexFunc(d.Status.Conditions, func(c appsv1.DeploymentCondition) bool {
+		return c.Type == appsv1.DeploymentAvailable
+	})
+	if i < 0 {
+		r.Logger.Info("failed to find deployment status condition, default to unknown", "deployment", d.Name)
+		return corev1.ConditionUnknown
+	}
+
+	return d.Status.Conditions[i].Status
 }
