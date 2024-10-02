@@ -13,8 +13,14 @@ spec:
       settings:
         - name: format.type
           value: structured
-        - name: format.options
-          value: "id:int,name:string,company:string,trial:bool"
+        - name: format.options.id
+          value: "int"
+        - name: format.options.name
+          value: "string"
+        - name: format.options.company
+          value: "string"
+        - name: format.options.trial
+          value: "bool"
         - name: recordCount
           value: "3"
     - name: destination-connector

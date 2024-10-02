@@ -12,7 +12,6 @@ spec:
     - name: source-connector
       type: source
       plugin: "builtin:generator"
-      pluginName: "builtin:generator"
       settings:
         - name: format.type
           value: structured
@@ -29,4 +28,3 @@ spec:
     - name: destination-connector
       type: destination
       plugin: "builtin:log"
-      pluginName: "builtin:log"

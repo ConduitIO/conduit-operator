@@ -1,4 +1,4 @@
-apiVersion: operator.conduit.io/v1
+apiVersion: operator.conduit.io/v1alpha
 kind: Conduit
 metadata:
   name: conduit-sample
@@ -9,7 +9,7 @@ spec:
   connectors:
     - name: source-connector
       type: source
-      plugin: foobar 
+      plugin: foobar
       settings:
         - name: path
           secretRef:
