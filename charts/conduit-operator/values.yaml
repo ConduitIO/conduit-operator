@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: conduitio/conduit-operator
+  repository: ghcr.io/conduitio/conduit-operator
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: "latest"
