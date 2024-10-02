@@ -330,9 +330,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 				readyReplicas,
 			)
 		default:
-			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
-				r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
-			}
+			r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
 		}
 
 		return ctrlutil.SetControllerReference(c, &deployment, r.Scheme())
