@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"runtime"
-	"time"
 	"slices"
+	"time"
 
 	"golang.org/x/exp/maps"
 
@@ -469,7 +469,6 @@ func (r *ConduitReconciler) getReplicas(c *v1.Conduit) int32 {
 	}
 	return 0
 }
-
 
 func (r *ConduitReconciler) deploymentRunningStatus(d *appsv1.Deployment) corev1.ConditionStatus {
 	// When the deployment is scaled down, return not running (false)
