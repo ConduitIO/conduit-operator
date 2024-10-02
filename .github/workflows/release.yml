@@ -8,6 +8,31 @@ permissions:
   contents: write
 
 jobs:
+  build-push-helm-chart:
+    name: Build and push Helm chart pkg
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: ${{ github.workspace }}/charts/build"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}
+          ref: gh-pages
+          path: tmp/charts
+      - name: Package Helm Chart
+        run: |
+          mkdir -p ${BUILD_DIR}
+          scripts/package-chart charts/conduit-operator ${BUILD_DIR} ${BUILD_DIR}/index.yaml
+          ls -all ${BUILD_DIR}
+          cat ${BUILD_DIR}/index.yaml"
+      - name: Release Helm Chart
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${BUILD_DIR}
+          keep_files: true
+
   build-push-docker-image:
     name: Build and push Docker image
     runs-on: ubuntu-latest
