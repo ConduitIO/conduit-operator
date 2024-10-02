@@ -25,7 +25,7 @@ jobs:
           mkdir -p ${BUILD_DIR}
           scripts/package-chart charts/conduit-operator ${BUILD_DIR} ${BUILD_DIR}/index.yaml
           ls -all ${BUILD_DIR}
-          cat ${BUILD_DIR}/index.yaml"
+          cat ${BUILD_DIR}/index.yaml
       - name: Release Helm Chart
         uses: peaceiris/actions-gh-pages@v4
         with:
