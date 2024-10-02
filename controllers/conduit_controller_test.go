@@ -826,6 +826,65 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 			},
 		},
 		{
+			name:    "deployment is stopped",
+			conduit: sampleConduit(false),
+			wantStatus: func() *v1alpha.ConduitStatus {
+				status := defaultConditions()
+				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionFalse, "", "")
+				status.SetCondition(v1alpha.ConditionConduitReady, corev1.ConditionFalse, "", "")
+
+				return status
+			}(),
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+				nn := c.NamespacedName()
+				deployment := &appsv1.Deployment{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      nn.Name,
+						Namespace: nn.Namespace,
+					},
+				}
+
+				client := mock.NewMockClient(ctrl)
+				client.EXPECT().Scheme().Return(conduitScheme)
+				client.EXPECT().Get(ctx, nn, &corev1.ConfigMap{}).
+					DoAndReturn(func(_ context.Context, _ types.NamespacedName, c *corev1.ConfigMap, _ ...kclient.CreateOption) error {
+						c.ResourceVersion = resourceVer
+						return nil
+					})
+				client.EXPECT().Get(ctx, nn, deployment).
+					DoAndReturn(func(_ context.Context, n types.NamespacedName, d *appsv1.Deployment, _ ...kclient.CreateOption) error {
+						is.Equal(n, nn)
+
+						d.Status = appsv1.DeploymentStatus{
+							Conditions: []appsv1.DeploymentCondition{
+								{
+									Type:   appsv1.DeploymentAvailable,
+									Status: corev1.ConditionTrue,
+								},
+							},
+						}
+
+						return nil
+					})
+
+				updatedDeployment := deployment.DeepCopy()
+				updatedDeployment.Spec.Template.Annotations = map[string]string{
+					"operator.conduit.io/config-map-version": "resource-version-121",
+				}
+				client.EXPECT().Update(ctx, mock.NewDeploymentMatcher(updatedDeployment)).Return(nil)
+
+				recorder := mock.NewMockEventRecorder(ctrl)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.StoppedReason, gomock.Any(), nn)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
+
+				return &controllers.ConduitReconciler{
+					Metadata:      &v1alpha.ConduitInstanceMetadata{},
+					Client:        client,
+					EventRecorder: recorder,
+				}
+			},
+		},
+		{
 			name:    "error when getting config map",
 			conduit: sampleConduit(true),
 			wantStatus: func() *v1alpha.ConduitStatus {
