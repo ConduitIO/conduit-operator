@@ -12,7 +12,7 @@ jobs:
     name: Build and push Helm chart pkg
     runs-on: ubuntu-latest
     env:
-      BUILD_DIR: charts/build"
+      BUILD_DIR: charts/build
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
