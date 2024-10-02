@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/hashicorp/go-multierror"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -12,6 +13,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
+
+var conduitVerConstraint *semver.Constraints
+
+func init() {
+	var err error
+	// validate constraint
+	sanitized, _ := strings.CutPrefix(ConduitEarliestAvailable, "v")
+	conduitVerConstraint, err = semver.NewConstraint(fmt.Sprint(">= ", sanitized))
+	if err != nil {
+		panic(fmt.Errorf("failed to create version constraint: %w", err))
+	}
+}
 
 func (r *Conduit) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -103,6 +116,13 @@ var _ webhook.Validator = &Conduit{}
 func (r *Conduit) ValidateCreate() (admission.Warnings, error) {
 	var errs error
 
+	if ok := validateConduitVersion(r.Spec.Version); !ok {
+		errs = multierror.Append(errs, fmt.Errorf("unsupported conduit version %s, minimum required %s",
+			r.Spec.Version,
+			ConduitEarliestAvailable,
+		))
+	}
+
 	if _, err := validateConnectors(r.Spec.Connectors); err != nil {
 		errs = multierror.Append(errs, err)
 	}
@@ -164,4 +184,13 @@ func validateProcessors(pp []*ConduitProcessor) (admission.Warnings, error) {
 	}
 
 	return nil, errs
+}
+
+func validateConduitVersion(ver string) bool {
+	sanitized, _ := strings.CutPrefix(ver, "v")
+	v, err := semver.NewVersion(sanitized)
+	if err != nil {
+		return false
+	}
+	return conduitVerConstraint.Check(v)
 }

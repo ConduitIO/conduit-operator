@@ -54,8 +54,8 @@ const (
 )
 
 var (
-	ConduitPipelineFile          = path.Join(ConduitPipelinePath, "pipeline.yaml")
-	ConduitWithProcessorsVersion = "0.9.0"
+	ConduitPipelineFile      = path.Join(ConduitPipelinePath, "pipeline.yaml")
+	ConduitEarliestAvailable = "v0.11.1"
 )
 
 // ConduitSpec defines the desired state of Conduit
