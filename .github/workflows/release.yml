@@ -12,25 +12,29 @@ jobs:
     name: Build and push Helm chart pkg
     runs-on: ubuntu-latest
     env:
-      BUILD_DIR: ${{ github.workspace }}/charts/build"
+      BUILD_DIR: charts/build"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}
           ref: gh-pages
-          path: tmp/charts
+          path: ${{ env.BUILD_DIR }}
       - name: Package Helm Chart
+        env:
+          WORKSPACE_BUILD_DIR: ${{ github.WORKSPACE }}/${{ env.BUILD_DIR}}
         run: |
-          mkdir -p ${BUILD_DIR}
-          scripts/package-chart charts/conduit-operator ${BUILD_DIR} ${BUILD_DIR}/index.yaml
-          ls -all ${BUILD_DIR}
-          cat ${BUILD_DIR}/index.yaml
+          mkdir -p ${WORKSPACE_BUILD_DIR}
+          scripts/package-chart charts/conduit-operator ${WORKSPACE_BUILD_DIR} ${WORKSPACE_BUILD_DIR}/index.yaml
+          ls -all ${WORKSPACE_BUILD_DIR}
+          cat ${WORKSPACE_BUILD_DIR}/index.yaml
       - name: Release Helm Chart
         uses: peaceiris/actions-gh-pages@v4
+        env:
+          WORKSPACE_BUILD_DIR: ${{ github.WORKSPACE }}/${{ env.BUILD_DIR}}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ${BUILD_DIR}
+          publish_dir: ${{ env.WORKSPACE_BUILD_DIR }}
           keep_files: true
 
   build-push-docker-image:
