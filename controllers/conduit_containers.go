@@ -136,8 +136,8 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) cor
 		"/app/conduit",
 		"-pipelines.path", v1alpha.ConduitPipelineFile,
 		"-connectors.path", v1alpha.ConduitConnectorsPath,
-		"-db.type", "badger",
-		"-db.badger.path", v1alpha.ConduitDBPath,
+		"-db.type", "sqlite",
+		"-db.sqlite.path", v1alpha.ConduitDBPath,
 		"-pipelines.exit-on-error",
 	}
 
