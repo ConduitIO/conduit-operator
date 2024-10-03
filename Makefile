@@ -1,6 +1,6 @@
 SHELL = /usr/bin/env bash -o pipefail
 
-REPO              ?= conduitio/conduit-operator
+REPO              ?= ghcr.io/conduitio/conduit-operator
 TAG               := $(shell date +%s)
 IMG               ?= $(REPO):$(TAG)
 NAME              := conduit-operator
