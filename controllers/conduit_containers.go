@@ -139,10 +139,7 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) cor
 		"-db.type", "sqlite",
 		"-db.sqlite.path", v1alpha.ConduitDBPath,
 		"-pipelines.exit-on-error",
-	}
-
-	if withProcessors(version) {
-		args = append(args, "-processors.path", v1alpha.ConduitProcessorsPath)
+		"-processors.path", v1alpha.ConduitProcessorsPath,
 	}
 
 	return corev1.Container{
