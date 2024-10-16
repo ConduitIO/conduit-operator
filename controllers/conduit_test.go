@@ -175,3 +175,13 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 
 	return c
 }
+
+func sampleConduitWithRegistry(running bool) *v1alpha.Conduit {
+	c := sampleConduit(running)
+
+	c.Spec.Registry = &v1alpha.SchemaRegistry{
+		URL: "http://localhost:9091/v1",
+	}
+
+	return c
+}

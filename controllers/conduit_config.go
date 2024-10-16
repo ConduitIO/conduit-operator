@@ -275,8 +275,8 @@ func valueOrSecret(ctx context.Context, cl client.Client, v v1alpha.SettingsVar)
 		return "", fmt.Errorf("failed to get %q secret: %w", v.SecretRef.Name, err)
 	}
 
-	if val, ok := secret.StringData[v.SecretRef.Key]; ok {
-		return val, nil
+	if val, ok := secret.Data[v.SecretRef.Key]; ok {
+		return string(val), nil
 	}
 
 	return "", nil
