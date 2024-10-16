@@ -2,6 +2,7 @@ package v1alpha
 
 import (
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -123,11 +124,15 @@ func (r *Conduit) ValidateCreate() (admission.Warnings, error) {
 		))
 	}
 
-	if _, err := validateConnectors(r.Spec.Connectors); err != nil {
+	if err := validateConnectors(r.Spec.Connectors); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
-	if _, err := validateProcessors(r.Spec.Processors); err != nil {
+	if err := validateProcessors(r.Spec.Processors); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+
+	if err := validateRegistry(r.Spec.Registry); err != nil {
 		errs = multierror.Append(errs, err)
 	}
 
@@ -137,7 +142,7 @@ func (r *Conduit) ValidateCreate() (admission.Warnings, error) {
 // ValidateUpdate implements webhook.Validator for the Conduit resource.
 // Error is returned when the changes to the resource are invalid.
 func (r *Conduit) ValidateUpdate(runtime.Object) (admission.Warnings, error) {
-	return validateConnectors(r.Spec.Connectors)
+	return nil, validateConnectors(r.Spec.Connectors)
 }
 
 // ValidateDelete implements webhook.Validator for the Conduit resource.
@@ -148,7 +153,7 @@ func (r *Conduit) ValidateDelete() (admission.Warnings, error) {
 
 // validateConnectors validates the attributes of connectors in the slice.
 // Error is return when the validation fails.
-func validateConnectors(cc []*ConduitConnector) (admission.Warnings, error) {
+func validateConnectors(cc []*ConduitConnector) error {
 	var errs error
 
 	for _, c := range cc {
@@ -161,15 +166,15 @@ func validateConnectors(cc []*ConduitConnector) (admission.Warnings, error) {
 			}
 		}
 
-		if _, err := validateProcessors(c.Processors); err != nil {
+		if err := validateProcessors(c.Processors); err != nil {
 			errs = multierror.Append(errs, err)
 		}
 	}
 
-	return nil, errs
+	return errs
 }
 
-func validateProcessors(pp []*ConduitProcessor) (admission.Warnings, error) {
+func validateProcessors(pp []*ConduitProcessor) error {
 	var errs error
 
 	for _, p := range pp {
@@ -183,7 +188,7 @@ func validateProcessors(pp []*ConduitProcessor) (admission.Warnings, error) {
 		}
 	}
 
-	return nil, errs
+	return errs
 }
 
 func validateConduitVersion(ver string) bool {
@@ -193,4 +198,17 @@ func validateConduitVersion(ver string) bool {
 		return false
 	}
 	return conduitVerConstraint.Check(v)
+}
+
+func validateRegistry(sr *SchemaRegistry) error {
+	if sr.URL == "" {
+		return nil
+	}
+
+	_, err := url.Parse(sr.URL)
+	if err != nil {
+		return fmt.Errorf("failed to validate registry url: %w", err)
+	}
+
+	return nil
 }
