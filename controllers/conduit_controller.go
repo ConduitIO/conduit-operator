@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/maps"
@@ -97,6 +98,10 @@ func (r *ConduitReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		errors = multierror.Append(errors, fmt.Errorf("error reconciling config: %w", err))
 	}
 
+	if err := r.CreateOrUpdateSecret(ctx, &conduit); err != nil {
+		errors = multierror.Append(errors, fmt.Errorf("error reconciling config: %w", err))
+	}
+
 	if err := r.CreateOrUpdateVolume(ctx, &conduit); err != nil {
 		errors = multierror.Append(errors, fmt.Errorf("error reconciling volume: %w", err))
 	}
@@ -172,7 +177,58 @@ func (r *ConduitReconciler) CreateOrUpdateConfig(ctx context.Context, c *v1.Cond
 	return nil
 }
 
-//
+// CreateOrUpdateConfig creates a secret which will be used by the conduit instance
+// to store sensitive information (credentials, etc)
+func (r *ConduitReconciler) CreateOrUpdateSecret(ctx context.Context, c *v1.Conduit) error {
+	var (
+		nn     = c.NamespacedName()
+		secret = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      nn.Name,
+				Namespace: nn.Namespace,
+			},
+		}
+	)
+
+	secretData, err := SchemaRegistryConfig(ctx, r.Client, c)
+	if err != nil {
+		return err
+	}
+
+	secretFn := func() error {
+		secret.Data = secretData
+
+		c.Status.SetCondition(
+			v1.ConditionConduitSecretReady,
+			corev1.ConditionTrue,
+			"SecretReady",
+			"Conduit secret created",
+		)
+
+		return ctrlutil.SetControllerReference(c, secret, r.Scheme())
+	}
+
+	op, err := ctrlutil.CreateOrUpdate(ctx, r, secret, secretFn)
+	if err != nil {
+		r.Eventf(c, corev1.EventTypeWarning, v1.ErroredReason, "Failed to reconcile config %q: %s", nn, err)
+		c.Status.SetCondition(
+			v1.ConditionConduitSecretReady,
+			corev1.ConditionFalse,
+			"ConduitSecretError",
+			err.Error(),
+		)
+		return err
+	}
+
+	switch op {
+	case ctrlutil.OperationResultUpdated:
+		r.Eventf(c, corev1.EventTypeNormal, v1.UpdatedReason, "Conduit secret %q updated", nn)
+	case ctrlutil.OperationResultCreated:
+		r.Eventf(c, corev1.EventTypeNormal, v1.CreatedReason, "Conduit secret %q created", nn)
+	}
+
+	return nil
+}
 
 // CreateOrUpdateVolume creates / updates the Conduit db volume resource.
 // Status conditions are set depending on the outcome of the operation.
@@ -233,6 +289,7 @@ func (r *ConduitReconciler) CreateOrUpdateVolume(ctx context.Context, c *v1.Cond
 func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.Conduit) error {
 	var (
 		cm       = corev1.ConfigMap{}
+		secret   = corev1.Secret{}
 		nn       = c.NamespacedName()
 		replicas = r.getReplicas(c)
 
@@ -253,6 +310,11 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		return err
 	}
 
+	if err := r.Get(ctx, nn, &secret); err != nil {
+		r.Eventf(c, corev1.EventTypeWarning, v1.ErroredReason, "Failed to get %q secret: %s", nn, err)
+		return err
+	}
+
 	annotations["operator.conduit.io/config-map-version"] = cm.ResourceVersion
 
 	// merge instance metadata
@@ -268,6 +330,15 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 	}
 
 	deploymentFn := func() error {
+		envVars := EnvVars(c)
+
+		if vars := envVarsFromSecret(&secret); len(vars) > 0 {
+			envVars = append(envVars, vars...)
+			slices.SortFunc(envVars, func(a, b corev1.EnvVar) int {
+				return strings.Compare(a.Name, b.Name)
+			})
+		}
+
 		spec := appsv1.DeploymentSpec{
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
@@ -280,7 +351,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 					RestartPolicy:  corev1.RestartPolicyAlways,
 					InitContainers: ConduitInitContainers(c.Spec.Connectors),
 					Containers: []corev1.Container{
-						ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, EnvVars(c)),
+						ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, envVars),
 					},
 					Volumes: []corev1.Volume{
 						ConduitVolume(nn.Name),

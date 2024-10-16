@@ -3,18 +3,63 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit/pkg/conduit"
 	cyaml "github.com/conduitio/conduit/pkg/provisioning/config/yaml/v2"
+
 	"github.com/conduitio/yaml/v3"
 	corev1 "k8s.io/api/core/v1"
 )
 
-const pipelineConfigVersion = "2.2"
+const (
+	pipelineConfigVersion = "2.2"
+)
+
+const (
+	schemaRegistryConnStringEnvVar = "CONDUIT_SCHEMA_REGISTRY_CONFLUENT_CONNECTION_STRING"
+	schemaRegistryTypeEnvVar       = "CONDUIT_SCHEMA_REGISTRY_TYPE"
+)
+
+func SchemaRegistryConfig(ctx context.Context, cl client.Client, c *v1alpha.Conduit) (map[string][]byte, error) {
+	data := make(map[string][]byte)
+
+	if c.Spec.Registry == nil || c.Spec.Registry.URL == "" {
+		return data, nil
+	}
+
+	u, err := url.Parse(c.Spec.Registry.URL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse registry URL: %w", err)
+	}
+
+	// scope the secret lookup to the conduit namespace
+	nsclient := client.NewNamespacedClient(cl, c.Namespace)
+
+	user, err := valueOrSecret(ctx, nsclient, c.Spec.Registry.Username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve registry username: %w", err)
+	}
+
+	password, err := valueOrSecret(ctx, nsclient, c.Spec.Registry.Password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve registry username: %w", err)
+	}
+
+	if password != "" {
+		u.User = url.UserPassword(user, password)
+	}
+
+	data[schemaRegistryTypeEnvVar] = []byte(conduit.SchemaRegistryTypeConfluent)
+	data[schemaRegistryConnStringEnvVar] = []byte(u.String())
+
+	return data, nil
+}
 
 // PipelineConfigYAML produces a conduit pipeline configuration in YAML.
 // Invalid configuration will result in a marshalling error.
@@ -85,6 +130,31 @@ func EnvVars(c *v1alpha.Conduit) []corev1.EnvVar {
 				},
 			})
 		}
+	}
+
+	return envVars
+}
+
+// envVarsFromSecret maps each key in a Secret to an EnvVar.
+func envVarsFromSecret(secret *corev1.Secret) []corev1.EnvVar {
+	var envVars []corev1.EnvVar
+
+	if len(secret.Data) == 0 {
+		return envVars
+	}
+
+	for k := range secret.Data {
+		envVars = append(envVars, corev1.EnvVar{
+			Name: k,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secret.Name,
+					},
+					Key: k,
+				},
+			},
+		})
 	}
 
 	return envVars
@@ -186,4 +256,28 @@ func processorConfig(ctx context.Context, cl client.Client, p *v1alpha.ConduitPr
 		Workers:   p.Workers,
 		Settings:  settings,
 	}, nil
+}
+
+func valueOrSecret(ctx context.Context, cl client.Client, v v1alpha.SettingsVar) (string, error) {
+	if v.SecretRef == nil {
+		return v.Value, nil
+	}
+
+	var secret corev1.Secret
+
+	if err := cl.Get(
+		ctx,
+		client.ObjectKey{
+			Name: v.SecretRef.Name,
+		},
+		&secret,
+	); err != nil {
+		return "", fmt.Errorf("failed to get %q secret: %w", v.SecretRef.Name, err)
+	}
+
+	if val, ok := secret.StringData[v.SecretRef.Key]; ok {
+		return val, nil
+	}
+
+	return "", nil
 }

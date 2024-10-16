@@ -12,6 +12,7 @@ import (
 const (
 	ConditionConduitReady             ConditionType = "Ready"
 	ConditionConduitConfigReady       ConditionType = "ConfigReady"
+	ConditionConduitSecretReady       ConditionType = "SecretReady"
 	ConditionConduitVolumeReady       ConditionType = "VolumeBound"
 	ConditionConduitDeploymentRunning ConditionType = "DeploymentRunning"
 	ConditionConduitServiceReady      ConditionType = "ServiceReady"
@@ -33,6 +34,7 @@ const (
 var conduitConditions = NewConditionSet(
 	ConditionConduitReady,
 	ConditionConduitConfigReady,
+	ConditionConduitSecretReady,
 	ConditionConduitVolumeReady,
 	ConditionConduitDeploymentRunning,
 	ConditionConduitServiceReady,
@@ -67,6 +69,7 @@ type ConduitSpec struct {
 	Running     *bool  `json:"running,omitempty"`
 	Version     string `json:"version,omitempty"`
 
+	Registry   *SchemaRegistry     `json:"schemaRegistry,omitempty"`
 	Connectors []*ConduitConnector `json:"connectors,omitempty"`
 	Processors []*ConduitProcessor `json:"processors,omitempty"`
 }
@@ -92,6 +95,13 @@ type ConduitProcessor struct {
 	Workers   int    `json:"workers,omitempty"`
 
 	Settings []SettingsVar `json:"settings,omitempty"`
+}
+
+type SchemaRegistry struct {
+	URL      string      `json:"url,omitempty"`
+	Username SettingsVar `json:"basicAuthUser,omitempty"`
+	Password SettingsVar `json:"basicAuthPassword,omitempty"`
+	Token    SettingsVar `json:"bearerToken,omitempty"`
 }
 
 type GlobalConfigMapRef struct {

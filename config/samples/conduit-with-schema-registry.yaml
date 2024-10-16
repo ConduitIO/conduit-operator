@@ -1,0 +1,31 @@
+apiVersion: operator.conduit.io/v1alpha
+kind: Conduit
+metadata:
+  name: conduit-generator-schema-registry
+spec:
+  running: true
+  name: generator.standalone.log
+  description: generator pipeline
+  schemaRegistry:
+    url: http://schema-registry-apicurio-registry.tenant:8080/apis/ccompat/v7
+  connectors:
+    - name: source-connector
+      type: source
+      plugin: conduitio/conduit-connector-generator
+      settings:
+        - name: format.type
+          value: structured
+        - name: format.options.id
+          value: "int"
+        - name: format.options.name
+          value: "string"
+        - name: format.options.company
+          value: "string"
+        - name: format.options.trial
+          value: "bool"
+        - name: recordCount
+          value: "3"
+    - name: destination-connector
+      type: destination
+      plugin: conduitio/conduit-connector-log
+      pluginVersion: v0.4.0

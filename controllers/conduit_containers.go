@@ -142,6 +142,8 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) cor
 		"-processors.path", v1alpha.ConduitProcessorsPath,
 	}
 
+	// schema registry is configured add it to here
+	// env var should be passed directly
 	return corev1.Container{
 		Name:            v1alpha.ConduitContainerName,
 		Image:           fmt.Sprint(image, ":", version),
