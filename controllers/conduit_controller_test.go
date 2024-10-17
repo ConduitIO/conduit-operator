@@ -158,6 +158,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 		s.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
 		s.SetCondition(v1alpha.ConditionConduitServiceReady, corev1.ConditionUnknown, "", "")
 		s.SetCondition(v1alpha.ConditionConduitVolumeReady, corev1.ConditionUnknown, "", "")
+		s.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionUnknown, "", "")
 
 		return s
 	}
@@ -303,6 +304,177 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 	}
 }
 
+func Test_CreateOrUpdateSecret(t *testing.T) {
+	var (
+		ctx           = context.Background()
+		conduitScheme = conduitScheme()
+		is            = is.New(t)
+	)
+
+	defaultConditions := func() *v1alpha.ConduitStatus {
+		s := &v1alpha.ConduitStatus{}
+		s.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
+		s.SetCondition(v1alpha.ConditionConduitServiceReady, corev1.ConditionUnknown, "", "")
+		s.SetCondition(v1alpha.ConditionConduitVolumeReady, corev1.ConditionUnknown, "", "")
+		s.SetCondition(v1alpha.ConditionConduitConfigReady, corev1.ConditionUnknown, "", "")
+		s.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionUnknown, "", "")
+
+		return s
+	}
+
+	tests := []struct {
+		name       string
+		conduit    *v1alpha.Conduit
+		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		wantStatus *v1alpha.ConduitStatus
+		wantErr    error
+	}{
+		{
+			name:    "creates secret",
+			conduit: sampleConduitWithRegistry(true),
+			wantStatus: func() *v1alpha.ConduitStatus {
+				status := defaultConditions()
+				status.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionTrue, "", "")
+				status.SetCondition(v1alpha.ConditionConduitReady, corev1.ConditionFalse, "", "")
+
+				return status
+			}(),
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+				nn := c.NamespacedName()
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      nn.Name,
+						Namespace: nn.Namespace,
+					},
+				}
+
+				client := mock.NewMockClient(ctrl)
+				client.EXPECT().Scheme().Return(conduitScheme)
+				client.EXPECT().
+					Get(ctx, nn, mock.NewSecretMatcher(secret)).
+					Return(notFoundErr)
+
+				secretCreated := secret.DeepCopy()
+				secretCreated.Data = map[string][]byte{
+					"CONDUIT_SCHEMA_REGISTRY_CONFLUENT_CONNECTION_STRING": []byte("http://localhost:9091/v1"),
+					"CONDUIT_SCHEMA_REGISTRY_TYPE":                        []byte("confluent"),
+				}
+
+				client.EXPECT().
+					Create(ctx, mock.NewSecretMatcher(secretCreated)).
+					Return(nil)
+
+				recorder := mock.NewMockEventRecorder(ctrl)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.CreatedReason, gomock.Any(), nn)
+
+				return &controllers.ConduitReconciler{
+					Client:        client,
+					EventRecorder: recorder,
+				}
+			},
+		},
+		{
+			name:    "updates secret",
+			conduit: sampleConduitWithRegistry(true),
+			wantStatus: func() *v1alpha.ConduitStatus {
+				status := defaultConditions()
+				status.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionTrue, "", "")
+				status.SetCondition(v1alpha.ConditionConduitReady, corev1.ConditionFalse, "", "")
+
+				return status
+			}(),
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+				nn := c.NamespacedName()
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      nn.Name,
+						Namespace: nn.Namespace,
+					},
+				}
+
+				client := mock.NewMockClient(ctrl)
+				client.EXPECT().Scheme().Return(conduitScheme)
+				client.EXPECT().Get(ctx, nn, mock.NewSecretMatcher(secret)).
+					DoAndReturn(func(_ context.Context, _ types.NamespacedName, s *corev1.Secret, _ ...kclient.GetOption) error {
+						s.Data = map[string][]byte{
+							"CONDUIT_SCHEMA_REGISTRY_TYPE": []byte("builtin"),
+						}
+						return nil
+					})
+
+				secretUpdated := secret.DeepCopy()
+				secretUpdated.Data = map[string][]byte{
+					"CONDUIT_SCHEMA_REGISTRY_CONFLUENT_CONNECTION_STRING": []byte("http://localhost:9091/v1"),
+					"CONDUIT_SCHEMA_REGISTRY_TYPE":                        []byte("confluent"),
+				}
+
+				client.EXPECT().Update(ctx, mock.NewSecretMatcher(secretUpdated)).Return(nil)
+
+				recorder := mock.NewMockEventRecorder(ctrl)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
+
+				return &controllers.ConduitReconciler{
+					Client:        client,
+					EventRecorder: recorder,
+				}
+			},
+		},
+		{
+			name:    "error while updating secret",
+			conduit: sampleConduit(true),
+			wantStatus: func() *v1alpha.ConduitStatus {
+				status := defaultConditions()
+				status.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionFalse, "", "")
+				status.SetCondition(v1alpha.ConditionConduitReady, corev1.ConditionFalse, "", "")
+
+				return status
+			}(),
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+				nn := c.NamespacedName()
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      nn.Name,
+						Namespace: nn.Namespace,
+					},
+				}
+
+				client := mock.NewMockClient(ctrl)
+				client.EXPECT().Get(ctx, nn, secret).Return(internalErr)
+
+				recorder := mock.NewMockEventRecorder(ctrl)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, gomock.Any())
+
+				return &controllers.ConduitReconciler{
+					Client:        client,
+					EventRecorder: recorder,
+				}
+			},
+			wantErr: errors.New("Internal error occurred: boom"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			r := tc.setup(ctrl, tc.conduit)
+
+			err := r.CreateOrUpdateSecret(ctx, tc.conduit)
+			if tc.wantErr != nil {
+				is.Equal(tc.wantErr.Error(), err.Error())
+			} else {
+				is.NoErr(err)
+			}
+
+			if diff := compareStatusConditions(
+				tc.wantStatus.Conditions,
+				tc.conduit.Status.Conditions,
+			); diff != "" {
+				t.Fatal(diff)
+			}
+		})
+	}
+}
+
 func Test_CreateOrUpdateVolume(t *testing.T) {
 	var (
 		ctx           = context.Background()
@@ -315,6 +487,7 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 		s.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
 		s.SetCondition(v1alpha.ConditionConduitServiceReady, corev1.ConditionUnknown, "", "")
 		s.SetCondition(v1alpha.ConditionConduitConfigReady, corev1.ConditionUnknown, "", "")
+		s.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionUnknown, "", "")
 
 		return s
 	}
@@ -647,6 +820,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 		s.SetCondition(v1alpha.ConditionConduitServiceReady, corev1.ConditionUnknown, "", "")
 		s.SetCondition(v1alpha.ConditionConduitVolumeReady, corev1.ConditionUnknown, "", "")
 		s.SetCondition(v1alpha.ConditionConduitConfigReady, corev1.ConditionUnknown, "", "")
+		s.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionUnknown, "", "")
 
 		return s
 	}
@@ -681,15 +855,55 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				client.EXPECT().Scheme().Return(conduitScheme)
 				client.EXPECT().Get(ctx, nn, &corev1.ConfigMap{}).
-					DoAndReturn(func(_ context.Context, _ types.NamespacedName, c *corev1.ConfigMap, _ ...kclient.CreateOption) error {
+					DoAndReturn(func(_ context.Context, _ types.NamespacedName, c *corev1.ConfigMap, _ ...kclient.GetOption) error {
 						c.ResourceVersion = resourceVer
 						return nil
 					})
+				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).
+					DoAndReturn(func(_ context.Context, _ types.NamespacedName, s *corev1.Secret, _ ...kclient.GetOption) error {
+						s.Name = nn.Name
+						s.Data = map[string][]byte{
+							"key1": []byte("data1"),
+							"key2": []byte("data2"),
+						}
+						return nil
+					})
+
 				client.EXPECT().Get(ctx, nn, deployment).Return(notFoundErr)
 
 				createdDeployment := deployment.DeepCopy()
 				createdDeployment.Spec.Template.Annotations = map[string]string{
 					"operator.conduit.io/config-map-version": resourceVer,
+				}
+				createdDeployment.Spec.Template.Spec.Containers = []corev1.Container{
+					{
+						Env: []corev1.EnvVar{
+							{Name: "SETTING2__AKEY", ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "setting2-secret-name"},
+									Key:                  "setting2-#akey",
+								},
+							}},
+							{Name: "SETTING3__S_KEY", ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "setting3-secret-name"},
+									Key:                  "setting3-%s-key",
+								},
+							}},
+							{Name: "key1", ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "conduit-server-sample"},
+									Key:                  "key1",
+								},
+							}},
+							{Name: "key2", ValueFrom: &corev1.EnvVarSource{
+								SecretKeyRef: &corev1.SecretKeySelector{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "conduit-server-sample"},
+									Key:                  "key2",
+								},
+							}},
+						},
+					},
 				}
 				client.EXPECT().Create(ctx, mock.NewDeploymentMatcher(createdDeployment)).Return(nil)
 
@@ -730,6 +944,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 						c.ResourceVersion = resourceVer
 						return nil
 					})
+				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(nil)
 
 				client.EXPECT().Get(ctx, nn, deployment).
 					DoAndReturn(func(_ context.Context, n types.NamespacedName, d *appsv1.Deployment, _ ...kclient.CreateOption) error {
@@ -791,6 +1006,8 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 						c.ResourceVersion = resourceVer
 						return nil
 					})
+				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(nil)
+
 				client.EXPECT().Get(ctx, nn, deployment).
 					DoAndReturn(func(_ context.Context, n types.NamespacedName, d *appsv1.Deployment, _ ...kclient.CreateOption) error {
 						is.Equal(n, nn)
@@ -851,6 +1068,8 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 						c.ResourceVersion = resourceVer
 						return nil
 					})
+				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(nil)
+
 				client.EXPECT().Get(ctx, nn, deployment).
 					DoAndReturn(func(_ context.Context, n types.NamespacedName, d *appsv1.Deployment, _ ...kclient.CreateOption) error {
 						is.Equal(n, nn)
@@ -912,6 +1131,34 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 			wantErr: errors.New("Internal error occurred: boom"),
 		},
 		{
+			name:    "error when getting secret",
+			conduit: sampleConduit(true),
+			wantStatus: func() *v1alpha.ConduitStatus {
+				status := defaultConditions()
+				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
+				status.SetCondition(v1alpha.ConditionConduitReady, corev1.ConditionUnknown, "", "")
+
+				return status
+			}(),
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+				nn := c.NamespacedName()
+
+				client := mock.NewMockClient(ctrl)
+				client.EXPECT().Get(ctx, nn, &corev1.ConfigMap{}).Return(nil)
+				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(internalErr)
+
+				recorder := mock.NewMockEventRecorder(ctrl)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, internalErr)
+
+				return &controllers.ConduitReconciler{
+					Metadata:      &v1alpha.ConduitInstanceMetadata{},
+					Client:        client,
+					EventRecorder: recorder,
+				}
+			},
+			wantErr: errors.New("Internal error occurred: boom"),
+		},
+		{
 			name:    "error when creating or updating deployment",
 			conduit: sampleConduit(true),
 			wantStatus: func() *v1alpha.ConduitStatus {
@@ -937,6 +1184,8 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 						c.ResourceVersion = resourceVer
 						return nil
 					})
+				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(nil)
+
 				client.EXPECT().Get(ctx, nn, deployment).Return(notFoundErr)
 
 				createdDeployment := deployment.DeepCopy()

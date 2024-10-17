@@ -47,6 +47,42 @@ func (m *configMapMatcher) Matches(x interface{}) bool {
 	return true
 }
 
+type secretMatcher struct {
+	want, got *corev1.Secret
+}
+
+func NewSecretMatcher(s *corev1.Secret) gomock.Matcher {
+	return &secretMatcher{want: s}
+}
+
+func (m *secretMatcher) Matches(x interface{}) bool {
+	other, ok := x.(*corev1.Secret)
+	if !ok {
+		return false
+	}
+	m.got = other
+
+	if m.want.Name != m.got.Name {
+		return false
+	}
+	if m.want.Namespace != m.got.Namespace {
+		return false
+	}
+	if diff := cmp.Diff(m.want.Data, m.got.Data); diff != "" {
+		return false
+	}
+	return true
+}
+
+func (m *secretMatcher) String() string {
+	s := fmt.Sprintf("%+v", m.want)
+	if m.got != nil {
+		s += fmt.Sprintf("%s\n\tDiff:\n%s\n", s, cmp.Diff(m.want, m.got))
+	}
+
+	return s
+}
+
 type pvcMatcher struct {
 	want, got *corev1.PersistentVolumeClaim
 }
@@ -181,6 +217,15 @@ func (m *deploymentMatcher) Matches(x interface{}) bool {
 		m.got.Spec.Template.Annotations,
 	); diff != "" {
 		return false
+	}
+
+	if len(m.want.Spec.Template.Spec.Containers) > 0 {
+		if diff := cmp.Diff(
+			m.want.Spec.Template.Spec.Containers[0].Env,
+			m.got.Spec.Template.Spec.Containers[0].Env,
+		); diff != "" {
+			return false
+		}
 	}
 
 	return true
