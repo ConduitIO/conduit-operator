@@ -117,11 +117,12 @@ jobs:
       - name: Remove creds file
         # always runs to delete creds file, regardless of prior steps
         if: always()
-        run: rm .git-credentials
+        run: rm -f .git-credentials
 
   merge-push-docker-image:
     name: Build and push Docker image
     runs-on: ubuntu-latest
+    needs: build-docker-image
     permissions:
       contents: read
       packages: write
