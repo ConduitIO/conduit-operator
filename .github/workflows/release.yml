@@ -1,11 +1,10 @@
 name: Release
 on:
-  push: # REMOVE BEFORE MERGE
-    branches:
-      - lk/publish-arm-images
   push:
     tags:
       - v*
+    branches:
+      - lk/publish-arm-images
 
 permissions:
   contents: write
