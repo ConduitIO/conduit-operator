@@ -171,7 +171,7 @@ jobs:
         working-directory: /tmp/digests
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ matrix.image }}@sha256:%s ' *)
+            $(printf '${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Inspect image
         run: |
