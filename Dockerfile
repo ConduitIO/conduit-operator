@@ -14,8 +14,9 @@ COPY cmd/ cmd/
 COPY api/ api/
 COPY controllers/ controllers/
 COPY pkg/ pkg/
+
 # Build
-ENV CGO_ENABLED=0 GOOS=linux GOARCH=amd64
+ENV CGO_ENABLED=0
 RUN go build -a -o conduit-operator cmd/operator/main.go
 
 # Use distroless as minimal base image to package the manager binary
