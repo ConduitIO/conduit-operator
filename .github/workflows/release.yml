@@ -3,8 +3,6 @@ on:
   push:
     tags:
       - v*
-    branches:
-      - lk/publish-arm-images
 
 permissions:
   contents: write
