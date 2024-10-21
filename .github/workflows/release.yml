@@ -1,7 +1,8 @@
 name: Release
 on:
-  workflow_dispatch:
-    ref: main
+  push: # REMOVE BEFORE MERGE
+    branches:
+      - lk/publish-arm-images
   push:
     tags:
       - v*
@@ -11,6 +12,7 @@ permissions:
 
 jobs:
   build-push-helm-chart:
+    if: ${{ startsWith(github.ref, 'refs/tags') }}
     name: Build and push Helm chart pkg
     runs-on: ubuntu-latest
     env:
