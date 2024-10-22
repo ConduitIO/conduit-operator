@@ -40,7 +40,7 @@ jobs:
 
   build-docker-image:
     name: Build Docker image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-l-${{ matrix.arch }}
     strategy:
       fail-fast: true
       matrix:
@@ -125,8 +125,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
-      id-token: write
     env:
       REGISTRY: ghcr.io
     steps:
