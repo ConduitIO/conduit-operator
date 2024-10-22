@@ -42,7 +42,7 @@ jobs:
 
   build-docker-image:
     name: Build Docker image
-    runs-on: ubuntu-latest-l-${{matrix.arch}}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
