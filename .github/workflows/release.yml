@@ -3,8 +3,6 @@ on:
   push:
     tags:
       - v*
-    branches:
-      - lk/speedup-arm-build
 
 permissions:
   contents: write
