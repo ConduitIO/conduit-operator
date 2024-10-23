@@ -13,7 +13,7 @@ as a distinct Conduit instance with its own lifecycle.
 The Conduit custom resource definition format is very similar to that of [pipeline configurations](https://conduit.io/docs/pipeline-configuration-files/getting-started).
 
 ```yaml
-apiVersion: operator.conduit.io/v1
+apiVersion: operator.conduit.io/v1alpha
 kind: Conduit
 metadata:
   name: conduit-generator
@@ -28,8 +28,14 @@ spec:
       settings:
         - name: format.type
           value: structured
-        - name: format.options
-          value: "id:int,name:string,company:string,trial:bool"
+        - name: format.options.id
+          value: "int"
+        - name: format.options.name
+          value: "string"
+        - name: format.options.company
+          value: "string"
+        - name: format.options.trial
+          value: "bool"
         - name: recordCount
           value: "3"
     - name: destination-connector
@@ -41,7 +47,7 @@ The operator can install standalone connectors referred by their github org / re
 Version can optionally be specified or the latest will be used. Format is `github-org/repo-name`, e.g. `conduitio/conduit-connector-generator`
 
 ```yaml
-apiVersion: operator.conduit.io/v1
+apiVersion: operator.conduit.io/v1alpha
 kind: Conduit
 metadata:
   name: conduit-generator
@@ -53,19 +59,71 @@ spec:
     - name: source-connector
       type: source
       plugin: conduitio/conduit-connector-generator
-      pluginVersion: v0.5.0
       settings:
         - name: format.type
           value: structured
-        - name: format.options
-          value: "id:int,name:string,company:string,trial:bool"
+        - name: format.options.id
+          value: "int"
+        - name: format.options.name
+          value: "string"
+        - name: format.options.company
+          value: "string"
+        - name: format.options.trial
+          value: "bool"
         - name: recordCount
           value: "3"
     - name: destination-connector
       type: destination
       plugin: conduitio/conduit-connector-log
-      pluginVersion: v0.3.0
 ```
+### Schema registry
+
+As of [v0.11.0](https://conduit.io/changelog/2024-08-19-conduit-0-11-0-release) Conduit supports the use of a schema registry. 
+This allows connectors to automatically extract or use the schema referred to by the OpenCDC record to encode/decode data. 
+
+By default conduit uses a builtin schema registry, however in certain use cases a schema registry needs to be shared between
+multiple instances. The conduit resource allows for schema registry to be defined as of [v0.2.0](https://github.com/ConduitIO/conduit-operator/releases/tag/v0.0.2).
+
+```yaml
+apiVersion: operator.conduit.io/v1alpha
+kind: Conduit
+metadata:
+  name: conduit-generator-schema-registry
+spec:
+  running: true
+  name: generator.standalone.log
+  description: generator pipeline
+  schemaRegistry:
+    url: http://apicurio:8080/apis/ccompat/v7
+    # basicAuthUser:
+    #   - value: <schemaUser>
+    # basicAuthPassword:
+    #   - secretRef:
+    #     key: schema-registry-password
+    #     name: schema-registry-secret
+  connectors:
+    - name: source-connector
+      type: source
+      plugin: conduitio/conduit-connector-generator
+      settings:
+        - name: format.type
+          value: structured
+        - name: format.options.id
+          value: "int"
+        - name: format.options.name
+          value: "string"
+        - name: format.options.company
+          value: "string"
+        - name: format.options.trial
+          value: "bool"
+        - name: recordCount
+          value: "3"
+    - name: destination-connector
+      type: destination
+      plugin: conduitio/conduit-connector-log
+      pluginVersion: v0.4.0
+```
+
 
 ## Quickstart
 
@@ -105,6 +163,23 @@ controller:
 ```
 
 For more configuration options see [charts/conduit-operator/values.yaml](charts/conduit-operator/values.yaml)
+
+### Using the helm chart repository
+
+Alternatively the operator can be deployed via the helm repository
+To add the repository to your helm repos:
+
+```shell
+helm repo add conduit https://conduitio.github.io/conduit-operator
+```
+
+Install the operator in the `conduit-operator` namespace of your cluster:
+
+```shell
+helm install conduit-operator conduit/conduit-operator --create-namespace -n conduit-operator
+```
+
+
 
 ## Development
 
