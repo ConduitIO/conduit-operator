@@ -3,7 +3,7 @@ entries:
   conduit-operator:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-10-22T16:26:49.768330191Z"
+    created: "2025-02-05T10:52:25.235611293Z"
     description: A Helm chart for the Conduit data stream tool
     digest: 67be80efc38da54967c7ba086d0916ab4940240662913050468a33d7f2b4f72a
     name: conduit-operator
@@ -13,9 +13,9 @@ entries:
     version: 0.1.0
   - apiVersion: v2
     appVersion: 0.0.2
-    created: "2024-10-22T16:26:49.767977502Z"
+    created: "2025-02-05T10:52:25.235241563Z"
     description: A Helm chart for the Conduit data stream tool
-    digest: c9ae3628528c3890c97ad8f40d56452206196fef96b93207dcd24eb63e01cf3b
+    digest: 5b6e2ba75cdf1c54d33492d0b6068c959bfb88c95d96bbb34f94819b95a55661
     name: conduit-operator
     type: application
     urls:
@@ -23,7 +23,7 @@ entries:
     version: 0.0.2
   - apiVersion: v2
     appVersion: 0.0.1
-    created: "2024-10-22T16:26:49.767619362Z"
+    created: "2025-02-05T10:52:25.234863517Z"
     description: A Helm chart for the Conduit data stream tool
     digest: ea9e6c1262b3028ba3a8200be0df308d8503cf2a60d2ab7b1ef3b2218aaed8d6
     name: conduit-operator
@@ -31,4 +31,4 @@ entries:
     urls:
     - conduit-operator-0.0.1.tgz
     version: 0.0.1
-generated: "2024-10-22T16:26:49.767123615Z"
+generated: "2025-02-05T10:52:25.234245143Z"
