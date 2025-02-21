@@ -134,12 +134,11 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) corev1.Container {
 	args := []string{
 		"/app/conduit",
-		"run",
 		"-pipelines.path", v1alpha.ConduitPipelineFile,
 		"-connectors.path", v1alpha.ConduitConnectorsPath,
 		"-db.type", "sqlite",
 		"-db.sqlite.path", v1alpha.ConduitDBPath,
-		"-pipelines.exit-on-degraded",
+		"-pipelines.exit-on-error",
 		"-processors.path", v1alpha.ConduitProcessorsPath,
 	}
 
