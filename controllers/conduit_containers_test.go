@@ -197,11 +197,12 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 		ImagePullPolicy: corev1.PullAlways,
 		Args: []string{
 			"/app/conduit",
+			"run",
 			"-pipelines.path", "/conduit.pipelines/pipeline.yaml",
 			"-connectors.path", "/conduit.storage/connectors",
 			"-db.type", "sqlite",
 			"-db.sqlite.path", "/conduit.storage/db",
-			"-pipelines.exit-on-error",
+			"-pipelines.exit-on-degraded",
 			"-processors.path",
 			"/conduit.storage/processors",
 		},
