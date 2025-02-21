@@ -201,6 +201,10 @@ func validateConduitVersion(ver string) bool {
 }
 
 func validateRegistry(sr *SchemaRegistry) error {
+	if sr == nil {
+		return nil
+	}
+
 	if sr.URL == "" {
 		return nil
 	}
