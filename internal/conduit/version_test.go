@@ -8,7 +8,7 @@ import (
 	"github.com/matryer/is"
 )
 
-func Test_ArgsByVersion(t *testing.T) {
+func Test_ForVersion(t *testing.T) {
 	tests := []struct {
 		name    string
 		version string
@@ -46,13 +46,13 @@ func Test_ArgsByVersion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
 
-			args := conduit.ArgsByVersion(
-				tc.version,
-				v1alpha.ConduitPipelineFile,
-				v1alpha.ConduitConnectorsPath,
-				v1alpha.ConduitDBPath,
-				v1alpha.ConduitProcessorsPath,
+			flags := conduit.NewFlags(
+				conduit.WithPipelineFile(v1alpha.ConduitPipelineFile),
+				conduit.WithConnectorsPath(v1alpha.ConduitConnectorsPath),
+				conduit.WithDBPath(v1alpha.ConduitDBPath),
+				conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
 			)
+			args := flags.ForVersion(tc.version)
 
 			is.Equal(args, tc.want)
 		})

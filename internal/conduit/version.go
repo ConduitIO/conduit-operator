@@ -1,30 +1,85 @@
 package conduit
 
-// ArgsByVersion returns the args needed for creating the
-// runtime container depending on the conduit version.
-func ArgsByVersion(version string, pipelineFile string, connectorsPath string, dbPath string, processorsPath string) []string {
-	var args []string
-	if version < "v0.12.0" {
-		args = []string{
-			"/app/conduit",
-			"-pipelines.path", pipelineFile,
-			"-connectors.path", connectorsPath,
-			"-db.type", "sqlite",
-			"-db.sqlite.path", dbPath,
-			"-pipelines.exit-on-error",
-			"-processors.path", processorsPath,
-		}
-	} else {
-		args = []string{
-			"/app/conduit",
-			"--pipelines.path", pipelineFile,
-			"--connectors.path", connectorsPath,
-			"--db.type", "sqlite",
-			"--db.sqlite.path", dbPath,
-			"--pipelines.exit-on-degraded",
-			"--processors.path", processorsPath,
-		}
-	}
+import (
+	"strings"
 
-	return args
+	"github.com/Masterminds/semver/v3"
+)
+
+type Flags struct {
+	args *Args
+}
+
+type Args struct {
+	PipelineFile   string
+	ConnectorsPath string
+	DBPath         string
+	ProcessorsPath string
+}
+
+func NewFlags(fns ...func(*Args)) *Flags {
+	var args Args
+	for _, fn := range fns {
+		fn(&args)
+	}
+	return &Flags{args: &args}
+}
+
+func (f *Flags) ForVersion(ver string) []string {
+	verConstraint, _ := semver.NewConstraint("< 0.12.0")
+	sanitized, _ := strings.CutPrefix(ver, "v")
+	v, _ := semver.NewVersion(sanitized)
+
+	if verConstraint.Check(v) {
+		return f.version011()
+	}
+	return f.version012()
+}
+
+func (f *Flags) version011() []string {
+	return []string{
+		"/app/conduit",
+		"-pipelines.path", f.args.PipelineFile,
+		"-connectors.path", f.args.ConnectorsPath,
+		"-db.type", "sqlite",
+		"-db.sqlite.path", f.args.DBPath,
+		"-pipelines.exit-on-error",
+		"-processors.path", f.args.ProcessorsPath,
+	}
+}
+
+func (f *Flags) version012() []string {
+	return []string{
+		"/app/conduit",
+		"--pipelines.path", f.args.PipelineFile,
+		"--connectors.path", f.args.ConnectorsPath,
+		"--db.type", "sqlite",
+		"--db.sqlite.path", f.args.DBPath,
+		"--pipelines.exit-on-degraded",
+		"--processors.path", f.args.ProcessorsPath,
+	}
+}
+
+func WithPipelineFile(file string) func(*Args) {
+	return func(a *Args) {
+		a.PipelineFile = file
+	}
+}
+
+func WithConnectorsPath(path string) func(*Args) {
+	return func(a *Args) {
+		a.ConnectorsPath = path
+	}
+}
+
+func WithDBPath(path string) func(*Args) {
+	return func(a *Args) {
+		a.DBPath = path
+	}
+}
+
+func WithProcessorsPath(path string) func(*Args) {
+	return func(a *Args) {
+		a.ProcessorsPath = path
+	}
 }
