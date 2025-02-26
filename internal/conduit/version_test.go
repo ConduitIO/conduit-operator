@@ -1,0 +1,60 @@
+package conduit_test
+
+import (
+	"testing"
+
+	"github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit-operator/pkg/conduit"
+	"github.com/matryer/is"
+)
+
+func Test_ArgsByVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		want    []string
+	}{
+		{
+			name:    "with version less than 0.12",
+			version: "v0.11.1",
+			want: []string{
+				"/app/conduit",
+				"-pipelines.path", "/conduit.pipelines/pipeline.yaml",
+				"-connectors.path", "/conduit.storage/connectors",
+				"-db.type", "sqlite",
+				"-db.sqlite.path", "/conduit.storage/db",
+				"-pipelines.exit-on-error",
+				"-processors.path", "/conduit.storage/processors",
+			},
+		},
+		{
+			name:    "with version more than 0.12",
+			version: "v0.12.0",
+			want: []string{
+				"/app/conduit",
+				"--pipelines.path", "/conduit.pipelines/pipeline.yaml",
+				"--connectors.path", "/conduit.storage/connectors",
+				"--db.type", "sqlite",
+				"--db.sqlite.path", "/conduit.storage/db",
+				"--pipelines.exit-on-degraded",
+				"--processors.path", "/conduit.storage/processors",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			is := is.New(t)
+
+			args := conduit.ArgsByVersion(
+				tc.version,
+				v1alpha.ConduitPipelineFile,
+				v1alpha.ConduitConnectorsPath,
+				v1alpha.ConduitDBPath,
+				v1alpha.ConduitProcessorsPath,
+			)
+
+			is.Equal(args, tc.want)
+		})
+	}
+}

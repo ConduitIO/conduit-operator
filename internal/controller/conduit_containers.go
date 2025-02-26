@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit-operator/pkg/conduit"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -132,15 +133,13 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 // ConduitRuntimeContainer returns a Kubernetes container definition
 // todo is the pipelineName supposed to be used?
 func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) corev1.Container {
-	args := []string{
-		"/app/conduit",
-		"-pipelines.path", v1alpha.ConduitPipelineFile,
-		"-connectors.path", v1alpha.ConduitConnectorsPath,
-		"-db.type", "sqlite",
-		"-db.sqlite.path", v1alpha.ConduitDBPath,
-		"-pipelines.exit-on-error",
-		"-processors.path", v1alpha.ConduitProcessorsPath,
-	}
+	args := conduit.ArgsByVersion(
+		version,
+		v1alpha.ConduitPipelineFile,
+		v1alpha.ConduitConnectorsPath,
+		v1alpha.ConduitDBPath,
+		v1alpha.ConduitProcessorsPath,
+	)
 
 	return corev1.Container{
 		Name:            v1alpha.ConduitContainerName,
