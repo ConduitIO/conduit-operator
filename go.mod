@@ -2,10 +2,6 @@ module github.com/conduitio/conduit-operator
 
 go 1.23.2
 
-toolchain go1.24.0
-
-godebug default=go1.23
-
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/conduitio/conduit v0.13.1
@@ -14,8 +10,6 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/matryer/is v1.4.1
-	github.com/onsi/ginkgo/v2 v2.22.2
-	github.com/onsi/gomega v1.36.2
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
 	gopkg.in/yaml.v3 v3.0.1
@@ -288,6 +282,7 @@ require (
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/oklog/run v1.1.0 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/onsi/ginkgo/v2 v2.22.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0 // indirect
 	github.com/opencontainers/runtime-spec v1.2.0 // indirect
