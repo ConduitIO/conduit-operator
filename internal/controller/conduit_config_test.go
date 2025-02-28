@@ -1,11 +1,12 @@
-package controllers_test
+package controller
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"testing"
 
-	"github.com/conduitio/conduit-operator/controllers/mock"
+	"github.com/conduitio/conduit-operator/internal/controller/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/matryer/is"
@@ -15,12 +16,11 @@ import (
 	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
 func Test_SchemaRegistryConfig(t *testing.T) {
 	ctx := context.Background()
-	internalErr := errors.New("boom error")
+	errInternal := errors.New("boom error")
 
 	tests := []struct {
 		name    string
@@ -34,7 +34,7 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 			client: func(t *testing.T) kclient.Client {
 				return mock.NewMockClient(gomock.NewController(t))
 			},
-			conduit: sampleConduitWithRegistry(false),
+			conduit: sampleConduitWithRegistry(t, false),
 			want: map[string][]byte{
 				"CONDUIT_SCHEMA_REGISTRY_CONFLUENT_CONNECTION_STRING": []byte("http://localhost:9091/v1"),
 				"CONDUIT_SCHEMA_REGISTRY_TYPE":                        []byte("confluent"),
@@ -46,7 +46,7 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 				return mock.NewMockClient(gomock.NewController(t))
 			},
 			conduit: func() *v1alpha.Conduit {
-				c := sampleConduitWithRegistry(false)
+				c := sampleConduitWithRegistry(t, false)
 				c.Spec.Registry.URL = "http://foo:baz@localhost:9091/v1"
 				c.Spec.Registry.Username = v1alpha.SettingsVar{Value: "foo"}
 				c.Spec.Registry.Password = v1alpha.SettingsVar{Value: "bar"}
@@ -90,7 +90,7 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 				return client
 			},
 			conduit: func() *v1alpha.Conduit {
-				c := sampleConduitWithRegistry(false)
+				c := sampleConduitWithRegistry(t, false)
 				c.Spec.Registry.URL = "http://localhost:9091/v1"
 				c.Spec.Registry.Username = v1alpha.SettingsVar{
 					SecretRef: &corev1.SecretKeySelector{
@@ -121,7 +121,7 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 				return mock.NewMockClient(gomock.NewController(t))
 			},
 			conduit: func() *v1alpha.Conduit {
-				c := sampleConduitWithRegistry(false)
+				c := sampleConduitWithRegistry(t, false)
 				c.Spec.Registry.URL = "$something%"
 				return c
 			}(),
@@ -131,12 +131,12 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 			name: "error when getting secret",
 			client: func(t *testing.T) kclient.Client {
 				client := mock.NewMockClient(gomock.NewController(t))
-				client.EXPECT().IsObjectNamespaced(&corev1.Secret{}).Return(false, internalErr)
+				client.EXPECT().IsObjectNamespaced(&corev1.Secret{}).Return(false, errInternal)
 
 				return client
 			},
 			conduit: func() *v1alpha.Conduit {
-				c := sampleConduitWithRegistry(false)
+				c := sampleConduitWithRegistry(t, false)
 				c.Spec.Registry.URL = "http://localhost:9091/v1"
 				c.Spec.Registry.Username = v1alpha.SettingsVar{
 					SecretRef: &corev1.SecretKeySelector{
@@ -156,7 +156,7 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
 
-			got, err := ctrls.SchemaRegistryConfig(ctx, tc.client(t), tc.conduit)
+			got, err := SchemaRegistryConfig(ctx, tc.client(t), tc.conduit)
 			if tc.wantErr != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
@@ -168,7 +168,7 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 }
 
 func Test_EnvVars(t *testing.T) {
-	c := sampleConduit(false)
+	c := sampleConduit(t, false)
 
 	// ordered
 	want := []corev1.EnvVar{
@@ -195,7 +195,7 @@ func Test_EnvVars(t *testing.T) {
 			},
 		},
 	}
-	if diff := cmp.Diff(want, ctrls.EnvVars(c)); diff != "" {
+	if diff := cmp.Diff(want, EnvVars(c)); diff != "" {
 		t.Fatalf("env vars mismatch (-want +got): %v", diff)
 	}
 }
@@ -208,24 +208,24 @@ func Test_PipelineConfigYAML(t *testing.T) {
 	}{
 		{
 			name:    "with running pipeline",
-			conduit: sampleConduit(true),
-			want:    mustReadFile("testdata/running-pipeline.yaml"),
+			conduit: sampleConduit(t, true),
+			want:    runningPipelineYAML,
 		},
 		{
 			name:    "with stopped pipeline",
-			conduit: sampleConduit(false),
-			want:    mustReadFile("testdata/stopped-pipeline.yaml"),
+			conduit: sampleConduit(t, false),
+			want:    stoppedPipelineYAML,
 		},
 		{
 			name:    "with processors",
-			conduit: sampleConduitWithProcessors(true),
-			want:    mustReadFile("testdata/pipeline-with-processors.yaml"),
+			conduit: sampleConduitWithProcessors(t, true),
+			want:    pipelineWithProcsYAML,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ctrls.PipelineConfigYAML(
+			got, err := PipelineConfigYAML(
 				context.Background(),
 				mock.NewMockClient(gomock.NewController(t)),
 				tc.conduit,

@@ -1,10 +1,9 @@
-package conduit_test
+package conduit
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/conduitio/conduit-operator/pkg/conduit"
 	"github.com/matryer/is"
 )
 
@@ -94,7 +93,7 @@ func Test_ValidatePlugin(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
 
-			err := conduit.ValidatePlugin(tc.pluginName)
+			err := ValidatePlugin(tc.pluginName)
 			if tc.wantErr != nil {
 				is.True(err != nil) // expected error
 				is.Equal(tc.wantErr.Error(), err.Error())
@@ -131,7 +130,7 @@ func Test_ValidatePluginType(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
-			err := conduit.ValidatePluginType(tc.pluginType)
+			err := ValidatePluginType(tc.pluginType)
 			if tc.wantErr != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {

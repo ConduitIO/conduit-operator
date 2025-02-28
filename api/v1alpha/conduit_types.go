@@ -31,7 +31,7 @@ const (
 	DeletedReason  = "Deleted"
 )
 
-var conduitConditions = NewConditionSet(
+var ConduitConditions = NewConditionSet(
 	ConditionConduitReady,
 	ConditionConduitConfigReady,
 	ConditionConduitSecretReady,
@@ -125,16 +125,16 @@ type ConduitStatus struct {
 }
 
 func (s *ConduitStatus) SetCondition(ct ConditionType, status corev1.ConditionStatus, reason string, message string) {
-	s.Conditions = conduitConditions.SetCondition(s.Conditions, ct, status, reason, message)
+	s.Conditions = ConduitConditions.SetCondition(s.Conditions, ct, status, reason, message)
 }
 
 func (s *ConduitStatus) GetCondition(ct ConditionType) *Condition {
-	return conduitConditions.GetCondition(s.Conditions, ct)
+	return ConduitConditions.GetCondition(s.Conditions, ct)
 }
 
 // ConditionChanged returns true when the expected condition status does not match current status
 func (s *ConduitStatus) ConditionChanged(ct ConditionType, expected corev1.ConditionStatus) bool {
-	if cond := conduitConditions.GetCondition(s.Conditions, ct); cond != nil {
+	if cond := ConduitConditions.GetCondition(s.Conditions, ct); cond != nil {
 		return cond.Status != expected
 	}
 
@@ -142,7 +142,9 @@ func (s *ConduitStatus) ConditionChanged(ct ConditionType, expected corev1.Condi
 }
 
 //+kubebuilder:object:root=true
+//+kubebuilder:storageversion
 //+kubebuilder:subresource:status
+//+kubebuilder:conversion:hub
 
 // Conduit is the Schema for the conduits API
 type Conduit struct {

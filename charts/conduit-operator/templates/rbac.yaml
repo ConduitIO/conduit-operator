@@ -1,6 +1,16 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
+  name: '{{ include "conduit-operator.fullname" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
   name: '{{ include "conduit-operator.fullname" . }}-leader-election-role'
   namespace: '{{ .Release.Namespace }}'
 rules:
@@ -35,6 +45,74 @@ rules:
   verbs:
   - create
   - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
+  name: '{{ include "conduit-operator.fullname" . }}-conduit-admin-role'
+rules:
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits
+  verbs:
+  - '*'
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
+  name: '{{ include "conduit-operator.fullname" . }}-conduit-editor-role'
+rules:
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
+  name: '{{ include "conduit-operator.fullname" . }}-conduit-viewer-role'
+rules:
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - operator.conduit.io
+  resources:
+  - conduits/status
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -114,8 +192,38 @@ rules:
   - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: '{{ include "conduit-operator.fullname" . }}-metrics-auth-role'
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: '{{ include "conduit-operator.fullname" . }}-metrics-reader'
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
   name: '{{ include "conduit-operator.fullname" . }}-leader-election-rolebinding'
   namespace: '{{ .Release.Namespace }}'
 roleRef:
@@ -124,12 +232,14 @@ roleRef:
   name: '{{ include "conduit-operator.fullname" . }}-leader-election-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "conduit-operator.serviceAccountName" . }}'
+  name: '{{ include "conduit-operator.fullname" . }}-controller-manager'
   namespace: '{{ .Release.Namespace }}'
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
   name: '{{ include "conduit-operator.fullname" . }}-manager-rolebinding'
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -137,5 +247,18 @@ roleRef:
   name: '{{ include "conduit-operator.fullname" . }}-manager-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "conduit-operator.serviceAccountName" . }}'
+  name: '{{ include "conduit-operator.fullname" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: '{{ include "conduit-operator.fullname" . }}-metrics-auth-rolebinding'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "conduit-operator.fullname" . }}-metrics-auth-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "conduit-operator.fullname" . }}-controller-manager'
   namespace: '{{ .Release.Namespace }}'

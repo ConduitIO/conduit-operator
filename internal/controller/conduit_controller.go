@@ -1,11 +1,12 @@
 //go:generate mockgen --build_flags=--mod=mod -destination=mock/client_mock.go -package=mock sigs.k8s.io/controller-runtime/pkg/client Client,StatusWriter
 //go:generate mockgen --build_flags=--mod=mod -destination=mock/recorder_mock.go -package=mock k8s.io/client-go/tools/record EventRecorder
 
-package controllers
+package controller
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"runtime"
 	"slices"
@@ -16,7 +17,6 @@ import (
 
 	v1 "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/go-logr/logr"
-	"github.com/hashicorp/go-multierror"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -62,7 +62,7 @@ type ConduitReconciler struct {
 func (r *ConduitReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	var (
 		conduit v1.Conduit
-		errors  error
+		errs    error
 
 		result = ctrl.Result{
 			RequeueAfter: 10 * time.Second,
@@ -95,30 +95,30 @@ func (r *ConduitReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if err := r.CreateOrUpdateConfig(ctx, &conduit); err != nil {
-		errors = multierror.Append(errors, fmt.Errorf("error reconciling config: %w", err))
+		errs = errors.Join(errs, fmt.Errorf("error reconciling config: %w", err))
 	}
 
 	if err := r.CreateOrUpdateSecret(ctx, &conduit); err != nil {
-		errors = multierror.Append(errors, fmt.Errorf("error reconciling config: %w", err))
+		errs = errors.Join(errs, fmt.Errorf("error reconciling config: %w", err))
 	}
 
 	if err := r.CreateOrUpdateVolume(ctx, &conduit); err != nil {
-		errors = multierror.Append(errors, fmt.Errorf("error reconciling volume: %w", err))
+		errs = errors.Join(errs, fmt.Errorf("error reconciling volume: %w", err))
 	}
 
 	if err := r.CreateOrUpdateDeployment(ctx, &conduit); err != nil {
-		errors = multierror.Append(errors, fmt.Errorf("error reconciling deployment: %w", err))
+		errs = errors.Join(errs, fmt.Errorf("error reconciling deployment: %w", err))
 	}
 
 	if err := r.CreateOrUpdateService(ctx, &conduit); err != nil {
-		errors = multierror.Append(errors, fmt.Errorf("error reconciling service: %w", err))
+		errs = errors.Join(errs, fmt.Errorf("error reconciling service: %w", err))
 	}
 
 	if err := r.UpdateStatus(ctx, &conduit); err != nil {
-		errors = multierror.Append(errors, fmt.Errorf("error updating status: %w", err))
+		errs = errors.Join(errs, fmt.Errorf("error updating status: %w", err))
 	}
 
-	return result, errors
+	return result, errs
 }
 
 // CreateOrUpdateConfig ensures the ConfigMap resource containing

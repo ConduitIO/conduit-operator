@@ -1,4 +1,4 @@
-package controllers_test
+package controller
 
 import (
 	"context"
@@ -25,13 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	"github.com/conduitio/conduit-operator/controllers"
-	"github.com/conduitio/conduit-operator/controllers/mock"
+	"github.com/conduitio/conduit-operator/internal/controller/mock"
 )
 
 var (
-	notFoundErr = apierrors.NewNotFound(schema.GroupResource{}, "not found")
-	internalErr = apierrors.NewInternalError(errors.New("boom"))
+	errNotFound = apierrors.NewNotFound(schema.GroupResource{}, "not found")
+	errInternal = apierrors.NewInternalError(errors.New("boom"))
 )
 
 func Test_Reconciler(t *testing.T) {
@@ -43,17 +42,17 @@ func Test_Reconciler(t *testing.T) {
 	tests := []struct {
 		name    string
 		conduit *v1alpha.Conduit
-		setup   func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		setup   func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler
 		result  runtimectrl.Result
 		wantErr error
 	}{
 		{
 			name:    "add finalizers",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			result: runtimectrl.Result{
 				RequeueAfter: 10 * time.Second,
 			},
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().
 					Get(ctx, kclient.ObjectKeyFromObject(c), &v1alpha.Conduit{}).
@@ -66,7 +65,7 @@ func Test_Reconciler(t *testing.T) {
 				ctrlutil.AddFinalizer(withFinalizers, v1alpha.ConduitFinalizer)
 				client.EXPECT().Update(ctx, withFinalizers)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: mock.NewMockEventRecorder(ctrl),
 					Logger:        logr.NewTestLogger(t),
@@ -75,8 +74,8 @@ func Test_Reconciler(t *testing.T) {
 		},
 		{
 			name:    "remove finalizers when deleted",
-			conduit: sampleConduit(true),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			conduit: sampleConduit(t, true),
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				now := metav1.Now()
 				deletedConduit := c.DeepCopy()
 				deletedConduit.ObjectMeta.DeletionTimestamp = &now
@@ -98,7 +97,7 @@ func Test_Reconciler(t *testing.T) {
 				recorder.EXPECT().
 					Eventf(withoutFinalizers, corev1.EventTypeNormal, v1alpha.DeletedReason, gomock.Any(), gomock.Any(), gomock.Any())
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 					Logger:        logr.NewTestLogger(t),
@@ -107,14 +106,14 @@ func Test_Reconciler(t *testing.T) {
 		},
 		{
 			name:    "error when fetching conduit",
-			conduit: sampleConduit(true),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			conduit: sampleConduit(t, true),
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().
 					Get(ctx, kclient.ObjectKeyFromObject(c), &v1alpha.Conduit{}).
-					Return(internalErr)
+					Return(errInternal)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: mock.NewMockEventRecorder(ctrl),
 					Logger:        logr.NewTestLogger(t),
@@ -149,7 +148,7 @@ func Test_Reconciler(t *testing.T) {
 func Test_CreateOrUpdateConfig(t *testing.T) {
 	var (
 		ctx           = context.Background()
-		conduitScheme = conduitScheme()
+		conduitScheme = conduitScheme(t)
 		is            = is.New(t)
 	)
 
@@ -166,13 +165,13 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 	tests := []struct {
 		name       string
 		conduit    *v1alpha.Conduit
-		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler
 		wantStatus *v1alpha.ConduitStatus
 		wantErr    error
 	}{
 		{
 			name:    "creates config map",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitConfigReady, corev1.ConditionTrue, "", "")
@@ -180,7 +179,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				cm := &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -192,11 +191,11 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 				client.EXPECT().Scheme().Return(conduitScheme)
 				client.EXPECT().
 					Get(ctx, nn, mock.NewConfigMapMatcher(cm)).
-					Return(notFoundErr)
+					Return(errNotFound)
 
 				cmCreated := cm.DeepCopy()
 				cmCreated.Data = map[string]string{
-					"pipeline.yaml": mustReadFile("testdata/running-pipeline.yaml"),
+					"pipeline.yaml": runningPipelineYAML,
 				}
 				client.EXPECT().
 					Create(ctx, mock.NewConfigMapMatcher(cmCreated)).
@@ -205,7 +204,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.CreatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -213,7 +212,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 		},
 		{
 			name:    "updates config map",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitConfigReady, corev1.ConditionTrue, "", "")
@@ -221,7 +220,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				cm := &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -235,14 +234,14 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 
 				cmUpdated := cm.DeepCopy()
 				cmUpdated.Data = map[string]string{
-					"pipeline.yaml": mustReadFile("testdata/running-pipeline.yaml"),
+					"pipeline.yaml": runningPipelineYAML,
 				}
 				client.EXPECT().Update(ctx, mock.NewConfigMapMatcher(cmUpdated)).Return(nil)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -250,7 +249,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 		},
 		{
 			name:    "error while updating config map",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitConfigReady, corev1.ConditionFalse, "", "")
@@ -258,8 +257,8 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
-				err := internalErr
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
+				err := errInternal
 				nn := c.NamespacedName()
 				cm := &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{
@@ -273,7 +272,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, gomock.Any())
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -294,12 +293,10 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 				is.NoErr(err)
 			}
 
-			if diff := compareStatusConditions(
+			cmpStatusConditions(t,
 				tc.wantStatus.Conditions,
 				tc.conduit.Status.Conditions,
-			); diff != "" {
-				t.Fatal(diff)
-			}
+			)
 		})
 	}
 }
@@ -307,7 +304,7 @@ func Test_CreateOrUpdateConfig(t *testing.T) {
 func Test_CreateOrUpdateSecret(t *testing.T) {
 	var (
 		ctx           = context.Background()
-		conduitScheme = conduitScheme()
+		conduitScheme = conduitScheme(t)
 		is            = is.New(t)
 	)
 
@@ -325,13 +322,13 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 	tests := []struct {
 		name       string
 		conduit    *v1alpha.Conduit
-		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler
 		wantStatus *v1alpha.ConduitStatus
 		wantErr    error
 	}{
 		{
 			name:    "creates secret",
-			conduit: sampleConduitWithRegistry(true),
+			conduit: sampleConduitWithRegistry(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionTrue, "", "")
@@ -339,7 +336,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				secret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -352,7 +349,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 				client.EXPECT().Scheme().Return(conduitScheme)
 				client.EXPECT().
 					Get(ctx, nn, mock.NewSecretMatcher(secret)).
-					Return(notFoundErr)
+					Return(errNotFound)
 
 				secretCreated := secret.DeepCopy()
 				secretCreated.Data = map[string][]byte{
@@ -367,7 +364,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.CreatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -375,7 +372,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 		},
 		{
 			name:    "updates secret",
-			conduit: sampleConduitWithRegistry(true),
+			conduit: sampleConduitWithRegistry(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionTrue, "", "")
@@ -383,7 +380,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				secret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -413,7 +410,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -421,7 +418,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 		},
 		{
 			name:    "error while updating secret",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitSecretReady, corev1.ConditionFalse, "", "")
@@ -429,7 +426,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				secret := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
@@ -439,12 +436,12 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 				}
 
 				client := mock.NewMockClient(ctrl)
-				client.EXPECT().Get(ctx, nn, secret).Return(internalErr)
+				client.EXPECT().Get(ctx, nn, secret).Return(errInternal)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, gomock.Any())
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -465,12 +462,10 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 				is.NoErr(err)
 			}
 
-			if diff := compareStatusConditions(
+			cmpStatusConditions(t,
 				tc.wantStatus.Conditions,
 				tc.conduit.Status.Conditions,
-			); diff != "" {
-				t.Fatal(diff)
-			}
+			)
 		})
 	}
 }
@@ -478,7 +473,7 @@ func Test_CreateOrUpdateSecret(t *testing.T) {
 func Test_CreateOrUpdateVolume(t *testing.T) {
 	var (
 		ctx           = context.Background()
-		conduitScheme = conduitScheme()
+		conduitScheme = conduitScheme(t)
 		is            = is.New(t)
 	)
 
@@ -495,13 +490,13 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 	tests := []struct {
 		name       string
 		conduit    *v1alpha.Conduit
-		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler
 		wantStatus *v1alpha.ConduitStatus
 		wantErr    error
 	}{
 		{
 			name:    "creates volume",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitVolumeReady, corev1.ConditionFalse, "", "")
@@ -509,19 +504,19 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
-				pvc := controllers.ConduitVolumeClaim(nn, "1Gi")
+				pvc := ConduitVolumeClaim(nn, "1Gi")
 
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().Scheme().Return(conduitScheme)
-				client.EXPECT().Get(ctx, nn, pvc).Return(notFoundErr)
+				client.EXPECT().Get(ctx, nn, pvc).Return(errNotFound)
 				client.EXPECT().Create(ctx, mock.NewPvcMatcher(pvc)).Return(nil)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.CreatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -529,7 +524,7 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 		},
 		{
 			name:    "updates volume",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitVolumeReady, corev1.ConditionFalse, "", "")
@@ -537,9 +532,9 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
-				pvc := controllers.ConduitVolumeClaim(nn, "1Gi")
+				pvc := ConduitVolumeClaim(nn, "1Gi")
 
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().Scheme().Return(conduitScheme)
@@ -549,7 +544,7 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -557,7 +552,7 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 		},
 		{
 			name:    "updates volume to bound",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitVolumeReady, corev1.ConditionTrue, "", "")
@@ -565,9 +560,9 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
-				pvc := controllers.ConduitVolumeClaim(nn, "1Gi")
+				pvc := ConduitVolumeClaim(nn, "1Gi")
 
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().Scheme().Return(conduitScheme)
@@ -585,7 +580,7 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.VolBoundReason, gomock.Any(), nn)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -593,7 +588,7 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 		},
 		{
 			name:    "error when updating volume",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitVolumeReady, corev1.ConditionFalse, "", "")
@@ -601,17 +596,17 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
-				pvc := controllers.ConduitVolumeClaim(nn, "1Gi")
+				pvc := ConduitVolumeClaim(nn, "1Gi")
 
 				client := mock.NewMockClient(ctrl)
-				client.EXPECT().Get(ctx, nn, pvc).Return(internalErr)
+				client.EXPECT().Get(ctx, nn, pvc).Return(errInternal)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
-				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, internalErr)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -632,12 +627,10 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 				is.NoErr(err)
 			}
 
-			if diff := compareStatusConditions(
+			cmpStatusConditions(t,
 				tc.wantStatus.Conditions,
 				tc.conduit.Status.Conditions,
-			); diff != "" {
-				t.Fatal(diff)
-			}
+			)
 		})
 	}
 }
@@ -645,20 +638,20 @@ func Test_CreateOrUpdateVolume(t *testing.T) {
 func Test_CreateOrUpdateService(t *testing.T) {
 	var (
 		ctx           = context.Background()
-		conduitScheme = conduitScheme()
+		conduitScheme = conduitScheme(t)
 		is            = is.New(t)
 	)
 
 	tests := []struct {
 		name       string
 		conduit    *v1alpha.Conduit
-		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler
 		wantStatus *v1alpha.ConduitStatus
 		wantErr    error
 	}{
 		{
 			name:    "service is created",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := &v1alpha.ConduitStatus{}
 				status.SetCondition(v1alpha.ConditionConduitServiceReady, corev1.ConditionTrue, "", "")
@@ -666,7 +659,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				svc := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
@@ -677,7 +670,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().Scheme().Return(conduitScheme)
-				client.EXPECT().Get(ctx, nn, svc).Return(notFoundErr)
+				client.EXPECT().Get(ctx, nn, svc).Return(errNotFound)
 
 				svcCreated := svc.DeepCopy()
 				svcCreated.Spec = corev1.ServiceSpec{
@@ -701,7 +694,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.CreatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -709,7 +702,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 		},
 		{
 			name:    "service is updated",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := &v1alpha.ConduitStatus{}
 				status.SetCondition(v1alpha.ConditionConduitServiceReady, corev1.ConditionTrue, "", "")
@@ -717,7 +710,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				svc := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
@@ -752,7 +745,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -760,7 +753,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 		},
 		{
 			name:    "error creating or updating service",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := &v1alpha.ConduitStatus{}
 				status.SetCondition(v1alpha.ConditionConduitServiceReady, corev1.ConditionFalse, "", "")
@@ -768,7 +761,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				svc := &corev1.Service{
 					ObjectMeta: metav1.ObjectMeta{
@@ -778,12 +771,12 @@ func Test_CreateOrUpdateService(t *testing.T) {
 				}
 
 				client := mock.NewMockClient(ctrl)
-				client.EXPECT().Get(ctx, nn, svc).Return(internalErr)
+				client.EXPECT().Get(ctx, nn, svc).Return(errInternal)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
-				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, internalErr)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -810,7 +803,7 @@ func Test_CreateOrUpdateService(t *testing.T) {
 func Test_CreateOrUpdateDeployment(t *testing.T) {
 	var (
 		ctx           = context.Background()
-		conduitScheme = conduitScheme()
+		conduitScheme = conduitScheme(t)
 		is            = is.New(t)
 		resourceVer   = "resource-version-121"
 	)
@@ -828,13 +821,13 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 	tests := []struct {
 		name       string
 		conduit    *v1alpha.Conduit
-		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler
 		wantStatus *v1alpha.ConduitStatus
 		wantErr    error
 	}{
 		{
 			name:    "deployment is created",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
@@ -842,7 +835,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
@@ -869,7 +862,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 						return nil
 					})
 
-				client.EXPECT().Get(ctx, nn, deployment).Return(notFoundErr)
+				client.EXPECT().Get(ctx, nn, deployment).Return(errNotFound)
 
 				createdDeployment := deployment.DeepCopy()
 				createdDeployment.Spec.Template.Annotations = map[string]string{
@@ -911,7 +904,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.PendingReason, gomock.Any(), nn, gomock.Any())
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.CreatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Metadata:      &v1alpha.ConduitInstanceMetadata{},
 					Client:        client,
 					EventRecorder: recorder,
@@ -920,7 +913,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 		},
 		{
 			name:    "deployment is updated",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionTrue, "", "")
@@ -928,7 +921,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
@@ -973,7 +966,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.RunningReason, gomock.Any(), nn, gomock.Any())
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Metadata:      &v1alpha.ConduitInstanceMetadata{},
 					Client:        client,
 					EventRecorder: recorder,
@@ -982,7 +975,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 		},
 		{
 			name:    "deployment is updated but not running",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionFalse, "", "")
@@ -990,7 +983,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1035,7 +1028,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.StoppedReason, gomock.Any(), nn)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Metadata:      &v1alpha.ConduitInstanceMetadata{},
 					Client:        client,
 					EventRecorder: recorder,
@@ -1044,7 +1037,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 		},
 		{
 			name:    "deployment is stopped",
-			conduit: sampleConduit(false),
+			conduit: sampleConduit(t, false),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionFalse, "", "")
@@ -1052,7 +1045,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1096,7 +1089,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.StoppedReason, gomock.Any(), nn)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Metadata:      &v1alpha.ConduitInstanceMetadata{},
 					Client:        client,
 					EventRecorder: recorder,
@@ -1105,7 +1098,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 		},
 		{
 			name:    "error when getting config map",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
@@ -1113,16 +1106,16 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 
 				client := mock.NewMockClient(ctrl)
-				client.EXPECT().Get(ctx, nn, &corev1.ConfigMap{}).Return(internalErr)
+				client.EXPECT().Get(ctx, nn, &corev1.ConfigMap{}).Return(errInternal)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
-				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, internalErr)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Metadata:      &v1alpha.ConduitInstanceMetadata{},
 					Client:        client,
 					EventRecorder: recorder,
@@ -1132,7 +1125,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 		},
 		{
 			name:    "error when getting secret",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionUnknown, "", "")
@@ -1140,17 +1133,17 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().Get(ctx, nn, &corev1.ConfigMap{}).Return(nil)
-				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(internalErr)
+				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(errInternal)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
-				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, internalErr)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Metadata:      &v1alpha.ConduitInstanceMetadata{},
 					Client:        client,
 					EventRecorder: recorder,
@@ -1160,7 +1153,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 		},
 		{
 			name:    "error when creating or updating deployment",
-			conduit: sampleConduit(true),
+			conduit: sampleConduit(t, true),
 			wantStatus: func() *v1alpha.ConduitStatus {
 				status := defaultConditions()
 				status.SetCondition(v1alpha.ConditionConduitDeploymentRunning, corev1.ConditionFalse, "", "")
@@ -1168,7 +1161,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 
 				return status
 			}(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				nn := c.NamespacedName()
 				deployment := &appsv1.Deployment{
 					ObjectMeta: metav1.ObjectMeta{
@@ -1186,19 +1179,19 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 					})
 				client.EXPECT().Get(ctx, nn, &corev1.Secret{}).Return(nil)
 
-				client.EXPECT().Get(ctx, nn, deployment).Return(notFoundErr)
+				client.EXPECT().Get(ctx, nn, deployment).Return(errNotFound)
 
 				createdDeployment := deployment.DeepCopy()
 				createdDeployment.Spec.Template.Annotations = map[string]string{
 					"operator.conduit.io/config-map-version": "resource-version-121",
 				}
-				client.EXPECT().Create(ctx, mock.NewDeploymentMatcher(createdDeployment)).Return(internalErr)
+				client.EXPECT().Create(ctx, mock.NewDeploymentMatcher(createdDeployment)).Return(errInternal)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
-				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, internalErr)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.PendingReason, gomock.Any(), nn, gomock.Any())
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Metadata:      &v1alpha.ConduitInstanceMetadata{},
 					Client:        client,
 					EventRecorder: recorder,
@@ -1220,12 +1213,10 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				is.NoErr(err)
 			}
 
-			if diff := compareStatusConditions(
+			cmpStatusConditions(t,
 				tc.wantStatus.Conditions,
 				tc.conduit.Status.Conditions,
-			); diff != "" {
-				t.Fatal(diff)
-			}
+			)
 		})
 	}
 }
@@ -1234,20 +1225,20 @@ func Test_UpdateStatus(t *testing.T) {
 	var (
 		ctx           = context.Background()
 		is            = is.New(t)
-		conduitSample = sampleConduit(true)
+		conduitSample = sampleConduit(t, true)
 	)
 
 	tests := []struct {
 		name       string
 		conduit    *v1alpha.Conduit
-		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler
+		setup      func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler
 		wantStatus *v1alpha.ConduitStatus
 		wantErr    error
 	}{
 		{
 			name:    "status is updated",
 			conduit: conduitSample.DeepCopy(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				client := mock.NewMockClient(ctrl)
 				statusWriter := mock.NewMockStatusWriter(ctrl)
 
@@ -1265,7 +1256,7 @@ func Test_UpdateStatus(t *testing.T) {
 				recorder.EXPECT().
 					Event(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, "Status updated")
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -1274,7 +1265,7 @@ func Test_UpdateStatus(t *testing.T) {
 		{
 			name:    "status is unchaged",
 			conduit: conduitSample.DeepCopy(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().
 					Get(ctx, kclient.ObjectKeyFromObject(c), &v1alpha.Conduit{}).
@@ -1283,7 +1274,7 @@ func Test_UpdateStatus(t *testing.T) {
 						return nil
 					})
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: mock.NewMockEventRecorder(ctrl),
 				}
@@ -1292,13 +1283,13 @@ func Test_UpdateStatus(t *testing.T) {
 		{
 			name:    "error getting latest conduit",
 			conduit: conduitSample.DeepCopy(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				client := mock.NewMockClient(ctrl)
 				client.EXPECT().
 					Get(ctx, kclient.ObjectKeyFromObject(c), &v1alpha.Conduit{}).
-					Return(internalErr)
+					Return(errInternal)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: mock.NewMockEventRecorder(ctrl),
 				}
@@ -1308,7 +1299,7 @@ func Test_UpdateStatus(t *testing.T) {
 		{
 			name:    "error updating status",
 			conduit: conduitSample.DeepCopy(),
-			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *controllers.ConduitReconciler {
+			setup: func(ctrl *gomock.Controller, c *v1alpha.Conduit) *ConduitReconciler {
 				client := mock.NewMockClient(ctrl)
 				statusWriter := mock.NewMockStatusWriter(ctrl)
 
@@ -1320,12 +1311,12 @@ func Test_UpdateStatus(t *testing.T) {
 						return nil
 					})
 				client.EXPECT().Status().Return(statusWriter)
-				statusWriter.EXPECT().Update(ctx, c).Return(internalErr)
+				statusWriter.EXPECT().Update(ctx, c).Return(errInternal)
 
 				recorder := mock.NewMockEventRecorder(ctrl)
-				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), internalErr)
+				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), errInternal)
 
-				return &controllers.ConduitReconciler{
+				return &ConduitReconciler{
 					Client:        client,
 					EventRecorder: recorder,
 				}
@@ -1349,9 +1340,12 @@ func Test_UpdateStatus(t *testing.T) {
 	}
 }
 
-func conduitScheme() *runtime.Scheme {
+func conduitScheme(t *testing.T) *runtime.Scheme {
+	t.Helper()
+
+	is := is.New(t)
 	scheme := runtime.NewScheme()
-	_ = v1alpha.AddToScheme(scheme)
+	is.NoErr(v1alpha.AddToScheme(scheme))
 	v1alpha.SchemeBuilder.Register(&v1alpha.Conduit{}, &v1alpha.ConduitList{})
 
 	return scheme

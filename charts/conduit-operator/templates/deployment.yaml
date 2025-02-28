@@ -26,9 +26,10 @@ spec:
         command:
         - /app/conduit-operator
         args:
+        - -webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
+        - -metrics-cert-path=/tmp/k8s-metrics-server/serving-certs
         - -zap-devel={{ .Values.controller.useDevLogger }}
-        - -instance-metadata
-        - {{ include "conduit-operator.conduitMetadataFile" . }}
+        - -instance-metadata={{ include "conduit-operator.conduitMetadataFile" . }}
         {{- if or .Values.controller.leaderElect .Values.autoscaling.enabled (gt (int .Values.replicaCount) 1) }}
         - -leader-elect
         {{- end }}
@@ -65,20 +66,27 @@ spec:
             - ALL
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
-          name: cert
+          name: webhook-cert
+          readOnly: true
+        - mountPath: /tmp/k8s-metrics-server/serving-certs
+          name: metrics-cert
           readOnly: true
         - mountPath: {{ .Values.controller.conduitInstance.metadataDir }}
           name: '{{ include "conduit-operator.fullname" . }}-instance-config'
           readOnly: true
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: '{{ include "conduit-operator.serviceAccountName" . }}'
+      serviceAccountName: '{{ include "conduit-operator.fullname" . }}-controller-manager'
       terminationGracePeriodSeconds: 10
       volumes:
-      - name: cert
+      - name: webhook-cert
         secret:
           defaultMode: 420
           secretName: webhook-server-cert
+      - name: metrics-cert
+        secret:
+          defaultMode: 420
+          secretName: metrics-server-cert
       - name: '{{ include "conduit-operator.fullname" . }}-instance-config'
         configMap:
            name: '{{ include "conduit-operator.fullname" . }}-instance-config'

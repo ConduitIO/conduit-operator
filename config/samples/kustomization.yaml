@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- operator_v1alpha_conduit.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

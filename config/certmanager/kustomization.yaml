@@ -2,7 +2,9 @@ namespace: '{{ .Release.Namespace }}'
 namePrefix: '{{ include "conduit-operator.fullname" . }}-'
 
 resources:
-- certificate.yaml
+- issuer.yaml
+- certificate-webhook.yaml
+- certificate-metrics.yaml
 
 configurations:
 - kustomizeconfig.yaml

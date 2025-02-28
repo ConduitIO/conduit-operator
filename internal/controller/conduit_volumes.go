@@ -1,4 +1,4 @@
-package controllers
+package controller
 
 import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"

@@ -1,4 +1,4 @@
-package controllers_test
+package controller
 
 import (
 	"testing"
@@ -12,7 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
 func Test_ConduitVolumeClaim(t *testing.T) {
@@ -37,7 +36,7 @@ func Test_ConduitVolumeClaim(t *testing.T) {
 		},
 	}
 
-	got := ctrls.ConduitVolumeClaim(nn, "10Gi")
+	got := ConduitVolumeClaim(nn, "10Gi")
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("volume claim mismatch (-want +got): %v", diff)
 	}
@@ -53,7 +52,7 @@ func Test_ConduitVolume(t *testing.T) {
 		},
 	}
 
-	got := ctrls.ConduitVolume("my-claim-name")
+	got := ConduitVolume("my-claim-name")
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("volume mismatch (-want +got): %v", diff)
 	}
@@ -73,7 +72,7 @@ func Test_ConduitPipelineVol(t *testing.T) {
 		},
 	}
 
-	got := ctrls.ConduitPipelineVol("my-ref-name")
+	got := ConduitPipelineVol("my-ref-name")
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatalf("volume mismatch (-want +got): %v", diff)
 	}

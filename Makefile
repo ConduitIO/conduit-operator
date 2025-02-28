@@ -7,11 +7,10 @@ NAME              := conduit-operator
 
 CERT_MANAGER      := https://github.com/cert-manager/cert-manager/releases/download/v1.9.1/cert-manager.yaml
 
-# KUSTOMIZE_VERSION ?= v4.5.7
-KUSTOMIZE_VERSION ?= v5.4.3
-CTRL_GEN_VERSION  ?= v0.16.3
+KUSTOMIZE_VERSION ?= v5.5.0
+CTRL_GEN_VERSION  ?= v0.17.2
 KIND_VERSION      ?= v0.24.0
-GOLINT_VERSION    ?= v1.61.0
+GOLINT_VERSION    ?= v1.63.4
 
 .EXPORT_ALL_VARIABLES:
 
@@ -83,7 +82,7 @@ manifests: bin/kustomize generate
 	kustomize build config/rbac > charts/conduit-operator/templates/rbac.yaml
 	# kustomize build config/manager > charts/conduit-operator/templates/deployment.yaml
 	kustomize build config/certmanager > charts/conduit-operator/templates/certificate.yaml
-	kustomize build config/webhook > charts/conduit-operator/templates/webhook.yaml
+	bin/kustomize build config/webhook > charts/conduit-operator/templates/webhook.yaml
 
 .PHONY: crds
 crds: bin/controller-gen
@@ -130,6 +129,7 @@ dev_delete:
 dev: crds manifests kind_setup kind_image_build helm_upgrade
 helm_upgrade:
 	helm upgrade $(NAME) \
+		--debug \
 		--atomic \
 		--create-namespace --namespace $(NAME) \
 		--install \
@@ -141,4 +141,5 @@ helm_upgrade:
 		--set "service.type=NodePort" \
 		--set "image.tag=$(TAG)" \
 		--set "image.pullPolicy=Never" \
+		$(HELM_EXTRA_OPTS) \
 		$(CURDIR)/charts/conduit-operator

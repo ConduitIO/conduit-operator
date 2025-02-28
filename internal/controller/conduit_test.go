@@ -1,35 +1,47 @@
-package controllers_test
+package controller
 
 import (
-	"os"
+	"context"
+	_ "embed"
+	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/matryer/is"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	webhook "github.com/conduitio/conduit-operator/internal/webhook/v1alpha"
 )
 
-func compareStatusConditions(want, got v1alpha.Conditions) string {
-	return cmp.Diff(want, got, cmpopts.IgnoreFields(v1alpha.Condition{}, []string{
+//go:embed testdata/running-pipeline.yaml
+var runningPipelineYAML string
+
+//go:embed testdata/stopped-pipeline.yaml
+var stoppedPipelineYAML string
+
+//go:embed testdata/pipeline-with-processors.yaml
+var pipelineWithProcsYAML string
+
+func cmpStatusConditions(t *testing.T, want, got v1alpha.Conditions) {
+	t.Helper()
+
+	is := is.New(t)
+	is.Equal("", cmp.Diff(want, got, cmpopts.IgnoreFields(v1alpha.Condition{}, []string{
 		"LastTransitionTime",
 		"Message",
 		"Reason",
-	}...))
+	}...)))
 }
 
-func mustReadFile(file string) string {
-	v, err := os.ReadFile(file)
-	if err != nil {
-		panic(err)
-	}
-	return string(v)
-}
+func sampleConduitWithProcessors(t *testing.T, running bool) *v1alpha.Conduit {
+	t.Helper()
 
-func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
-	c := sampleConduit(running)
+	is := is.New(t)
+	c := sampleConduit(t, running)
+	defaulter := &webhook.ConduitCustomDefaulter{}
 
 	c.Spec.Processors = []*v1alpha.ConduitProcessor{
 		{
@@ -55,9 +67,7 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 		},
 	}
 
-	if len(c.Spec.Connectors) != 2 {
-		panic("unexpected number of connectors")
-	}
+	is.Equal(len(c.Spec.Connectors), 2)
 
 	// source
 	c.Spec.Connectors[0].Processors = []*v1alpha.ConduitProcessor{
@@ -110,12 +120,17 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	}
 
 	// apply defaults as they would
-	c.Default()
+	is.NoErr(defaulter.Default(context.Background(), c))
 
 	return c
 }
 
-func sampleConduit(running bool) *v1alpha.Conduit {
+func sampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
+	t.Helper()
+
+	is := is.New(t)
+	defaulter := &webhook.ConduitCustomDefaulter{}
+
 	c := &v1alpha.Conduit{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sample",
@@ -171,13 +186,15 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 	}
 
 	// apply defaults as they would
-	c.Default()
+	is.NoErr(defaulter.Default(context.Background(), c))
 
 	return c
 }
 
-func sampleConduitWithRegistry(running bool) *v1alpha.Conduit {
-	c := sampleConduit(running)
+func sampleConduitWithRegistry(t *testing.T, running bool) *v1alpha.Conduit {
+	t.Helper()
+
+	c := sampleConduit(t, running)
 
 	c.Spec.Registry = &v1alpha.SchemaRegistry{
 		URL: "http://localhost:9091/v1",

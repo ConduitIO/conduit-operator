@@ -1,6 +1,24 @@
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
+  name: '{{ include "conduit-operator.fullname" . }}-metrics-certs'
+  namespace: '{{ .Release.Namespace }}'
+spec:
+  dnsNames:
+  - '{{ include "conduit-operator.fullname" . }}-metrics.{{ .Release.Namespace }}.svc'
+  - '{{ include "conduit-operator.fullname" . }}-metrics.{{ .Release.Namespace }}.svc.cluster.local'
+  issuerRef:
+    kind: Issuer
+    name: '{{ include "conduit-operator.fullname" . }}-selfsigned-issuer'
+  secretName: metrics-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
   name: '{{ include "conduit-operator.fullname" . }}-serving-cert'
   namespace: '{{ .Release.Namespace }}'
 spec:
@@ -15,6 +33,8 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
+  labels:
+    app.kubernetes.io/name: conduit-operator
   name: '{{ include "conduit-operator.fullname" . }}-selfsigned-issuer'
   namespace: '{{ .Release.Namespace }}'
 spec:
