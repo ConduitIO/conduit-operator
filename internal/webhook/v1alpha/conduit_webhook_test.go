@@ -28,7 +28,8 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(testname(tc.supported, tc.ver), func(t *testing.T) {
 			is := is.New(t)
-			is.Equal(validateConduitVersion(tc.ver), tc.supported)
+			v := &ConduitCustomValidator{}
+			is.Equal(v.validateConduitVersion(tc.ver), tc.supported)
 		})
 	}
 }
