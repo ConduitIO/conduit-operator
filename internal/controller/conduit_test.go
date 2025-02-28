@@ -1,6 +1,7 @@
-package controllers_test
+package controller
 
 import (
+	"context"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	webhook "github.com/conduitio/conduit-operator/internal/webhook/v1alpha"
 )
 
 func compareStatusConditions(want, got v1alpha.Conditions) string {
@@ -30,6 +32,7 @@ func mustReadFile(file string) string {
 
 func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	c := sampleConduit(running)
+	defaulter := &webhook.ConduitCustomDefaulter{}
 
 	c.Spec.Processors = []*v1alpha.ConduitProcessor{
 		{
@@ -110,12 +113,14 @@ func sampleConduitWithProcessors(running bool) *v1alpha.Conduit {
 	}
 
 	// apply defaults as they would
-	c.Default()
+	defaulter.Default(context.Background(), c)
 
 	return c
 }
 
 func sampleConduit(running bool) *v1alpha.Conduit {
+	defaulter := &webhook.ConduitCustomDefaulter{}
+
 	c := &v1alpha.Conduit{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "sample",
@@ -171,7 +176,7 @@ func sampleConduit(running bool) *v1alpha.Conduit {
 	}
 
 	// apply defaults as they would
-	c.Default()
+	defaulter.Default(context.Background(), c)
 
 	return c
 }

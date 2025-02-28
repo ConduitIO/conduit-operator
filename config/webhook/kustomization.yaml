@@ -3,7 +3,6 @@ namePrefix: '{{ include "conduit-operator.fullname" . }}-'
 
 resources:
 - manifests.yaml
-# Disable service kustomization because of helm templating
 # - service.yaml
 
 patches:

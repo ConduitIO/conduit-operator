@@ -1,11 +1,11 @@
-package controllers_test
+package controller
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/conduitio/conduit-operator/controllers/mock"
+	"github.com/conduitio/conduit-operator/internal/controller/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/google/go-cmp/cmp"
 	"github.com/matryer/is"
@@ -15,7 +15,6 @@ import (
 	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
 func Test_SchemaRegistryConfig(t *testing.T) {
@@ -156,7 +155,7 @@ func Test_SchemaRegistryConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
 
-			got, err := ctrls.SchemaRegistryConfig(ctx, tc.client(t), tc.conduit)
+			got, err := SchemaRegistryConfig(ctx, tc.client(t), tc.conduit)
 			if tc.wantErr != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
@@ -195,7 +194,7 @@ func Test_EnvVars(t *testing.T) {
 			},
 		},
 	}
-	if diff := cmp.Diff(want, ctrls.EnvVars(c)); diff != "" {
+	if diff := cmp.Diff(want, EnvVars(c)); diff != "" {
 		t.Fatalf("env vars mismatch (-want +got): %v", diff)
 	}
 }
@@ -225,7 +224,7 @@ func Test_PipelineConfigYAML(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ctrls.PipelineConfigYAML(
+			got, err := PipelineConfigYAML(
 				context.Background(),
 				mock.NewMockClient(gomock.NewController(t)),
 				tc.conduit,

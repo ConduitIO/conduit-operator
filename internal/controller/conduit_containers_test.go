@@ -1,4 +1,4 @@
-package controllers_test
+package controller
 
 import (
 	"testing"
@@ -9,7 +9,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	ctrls "github.com/conduitio/conduit-operator/controllers"
 )
 
 func Test_ConduitInitContainers(t *testing.T) {
@@ -182,7 +181,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ctrls.ConduitInitContainers(tc.connectors)
+			got := ConduitInitContainers(tc.connectors)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Fatalf("container mismatch (-want +got): %v", diff)
 			}
@@ -253,7 +252,7 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 		},
 	}
 
-	got := ctrls.ConduitRuntimeContainer(
+	got := ConduitRuntimeContainer(
 		"my-image",
 		"v0.11.1",
 		[]corev1.EnvVar{

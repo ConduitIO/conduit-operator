@@ -4,7 +4,7 @@ metadata:
   annotations:
     cert-manager.io/inject-ca-from: '{{ .Release.Namespace }}/{{ include "conduit-operator.fullname"
       . }}-serving-cert'
-    controller-gen.kubebuilder.io/version: v0.16.3
+    controller-gen.kubebuilder.io/version: v0.17.2
   name: conduits.operator.conduit.io
 spec:
   conversion:
