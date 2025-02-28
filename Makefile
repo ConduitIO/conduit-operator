@@ -129,6 +129,7 @@ dev_delete:
 dev: crds manifests kind_setup kind_image_build helm_upgrade
 helm_upgrade:
 	helm upgrade $(NAME) \
+		--debug \
 		--atomic \
 		--create-namespace --namespace $(NAME) \
 		--install \
@@ -140,4 +141,5 @@ helm_upgrade:
 		--set "service.type=NodePort" \
 		--set "image.tag=$(TAG)" \
 		--set "image.pullPolicy=Never" \
+		$(HELM_EXTRA_OPTS) \
 		$(CURDIR)/charts/conduit-operator

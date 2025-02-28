@@ -76,7 +76,7 @@ spec:
           readOnly: true
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: '{{ include "conduit-operator.serviceAccountName" . }}'
+      serviceAccountName: '{{ include "conduit-operator.fullname" . }}-controller-manager'
       terminationGracePeriodSeconds: 10
       volumes:
       - name: webhook-cert
