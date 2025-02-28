@@ -58,7 +58,6 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
-// nolint:gocyclo
 func main() {
 	var (
 		enableHTTP2                                      bool

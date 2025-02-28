@@ -63,7 +63,7 @@ type ConduitCustomDefaulter struct{}
 var _ webhook.CustomDefaulter = &ConduitCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind Conduit.
-func (d *ConduitCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
+func (d *ConduitCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
 	conduit, ok := obj.(*v1alpha.Conduit)
 
 	if !ok {
@@ -149,7 +149,7 @@ type ConduitCustomValidator struct{}
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
-func (v *ConduitCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
 	conduit, ok := obj.(*v1alpha.Conduit)
 	if !ok {
 		return nil, fmt.Errorf("expected a Conduit object but got %T", obj)
@@ -180,7 +180,7 @@ func (v *ConduitCustomValidator) ValidateCreate(ctx context.Context, obj runtime
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
-func (v *ConduitCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj runtime.Object) (admission.Warnings, error) {
+func (v *ConduitCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
 	conduit, ok := newObj.(*v1alpha.Conduit)
 	if !ok {
 		return nil, fmt.Errorf("expected a Conduit object for the newObj but got %T", newObj)
@@ -190,7 +190,7 @@ func (v *ConduitCustomValidator) ValidateUpdate(ctx context.Context, oldObj, new
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
-func (v *ConduitCustomValidator) ValidateDelete(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *ConduitCustomValidator) ValidateDelete(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
 	if _, ok := obj.(*v1alpha.Conduit); !ok {
 		return nil, fmt.Errorf("expected a Conduit object but got %T", obj)
 	}
