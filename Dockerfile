@@ -16,13 +16,13 @@ COPY internal internal/
 
 # Build
 ENV CGO_ENABLED=0
-RUN go build -a -o conduit-operator cmd/operator/main.go
+RUN go build -a -ldflags="-s -w" -o conduit-operator cmd/operator/main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
+# The delta in size between alpine and distroless is negligent.
+# Alpine is preferable as provides better access to tools inside the image, if needed.
 # FROM gcr.io/distroless/static:nonroot
 
-FROM alpine:3.20
+FROM alpine:3.21
 WORKDIR /app
 COPY --from=builder /workspace/conduit-operator /app
 USER 65532:65532
