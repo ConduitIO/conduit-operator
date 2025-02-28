@@ -9,11 +9,18 @@ import (
 )
 
 var (
-	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "operator.conduit.io", Version: "v1alpha"}
+	// GroupVersionKind is group version used to register these objects
+	GroupVersionKind = schema.GroupVersionKind{
+		Group:   "operator.conduit.io",
+		Version: "v1alpha",
+		Kind:    "Conduit",
+	}
+
+	// GroupKind is the group kind
+	GroupKind = GroupVersionKind.GroupKind()
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
-	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
+	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersionKind.GroupVersion()}
 
 	// AddToScheme adds the types in this group-version to the given scheme.
 	AddToScheme = SchemeBuilder.AddToScheme

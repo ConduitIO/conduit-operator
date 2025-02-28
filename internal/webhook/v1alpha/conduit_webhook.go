@@ -18,19 +18,20 @@ package v1alpha
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
 	"strings"
 
-	"github.com/Masterminds/semver/v3"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
+	"github.com/Masterminds/semver/v3"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 )
 
@@ -155,28 +156,32 @@ func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 		return nil, fmt.Errorf("expected a Conduit object but got %T", obj)
 	}
 
-	var errs error
+	var errs field.ErrorList
 
-	if ok := v.validateConduitVersion(conduit.Spec.Version); !ok {
-		errs = errors.Join(errs, fmt.Errorf("unsupported conduit version %s, minimum required %s",
-			conduit.Spec.Version,
-			v1alpha.ConduitEarliestAvailable,
-		))
+	if err := v.validateConduitVersion(conduit.Spec.Version); err != nil {
+		errs = append(errs, err)
 	}
 
-	if err := v.validateConnectors(conduit.Spec.Connectors); err != nil {
-		errs = errors.Join(errs, err)
+	if verrs := v.validateConnectors(conduit.Spec.Connectors); len(verrs) > 0 {
+		errs = append(errs, verrs...)
 	}
 
-	if err := v.validateProcessors(conduit.Spec.Processors); err != nil {
-		errs = errors.Join(errs, err)
+	if verrs := v.validateProcessors(
+		conduit.Spec.Processors,
+		field.NewPath("spec").Child("processors"),
+	); len(verrs) > 0 {
+		errs = append(errs, verrs...)
 	}
 
 	if err := v.validateRegistry(conduit.Spec.Registry); err != nil {
-		errs = errors.Join(errs, err)
+		errs = append(errs, err)
 	}
 
-	return nil, errs
+	if len(errs) > 0 {
+		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
+	}
+
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
@@ -186,7 +191,11 @@ func (v *ConduitCustomValidator) ValidateUpdate(_ context.Context, _, newObj run
 		return nil, fmt.Errorf("expected a Conduit object for the newObj but got %T", newObj)
 	}
 
-	return nil, v.validateConnectors(conduit.Spec.Connectors)
+	if errs := v.validateConnectors(conduit.Spec.Connectors); len(errs) > 0 {
+		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
+	}
+
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
@@ -200,60 +209,74 @@ func (v *ConduitCustomValidator) ValidateDelete(_ context.Context, obj runtime.O
 
 // validateConnectors validates the attributes of connectors in the slice.
 // Error is return when the validation fails.
-func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnector) error {
-	var errs error
+func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnector) field.ErrorList {
+	var errs field.ErrorList
 
+	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
 		for _, fn := range connectorValidators {
-			if err := fn(c); err != nil {
-				errs = errors.Join(
-					errs,
-					fmt.Errorf("connector validation failure %q: %w", c.Name, err),
-				)
+			if err := fn(c, fp); err != nil {
+				errs = append(errs, err)
 			}
 		}
 
-		if err := v.validateProcessors(c.Processors); err != nil {
-			errs = errors.Join(errs, err)
+		if procErrs := v.validateProcessors(c.Processors, fp); procErrs != nil {
+			errs = append(errs, procErrs...)
 		}
 	}
 
-	return errs
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return nil
 }
 
-func (*ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcessor) error {
-	var errs error
+func (*ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcessor, fp *field.Path) field.ErrorList {
+	var errs field.ErrorList
 
 	for _, p := range pp {
-		for _, fn := range processorValidators {
-			if err := fn(p); err != nil {
-				errs = errors.Join(
-					errs,
-					fmt.Errorf("processor validation failure %q: %w", p.Name, err),
-				)
-			}
+		if err := validateProcessorPlugin(p, fp); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	return errs
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return nil
 }
 
-func (*ConduitCustomValidator) validateConduitVersion(ver string) bool {
+func (*ConduitCustomValidator) validateConduitVersion(ver string) *field.Error {
 	sanitized, _ := strings.CutPrefix(ver, "v")
+	fp := field.NewPath("spec").Child("version")
+
 	v, err := semver.NewVersion(sanitized)
 	if err != nil {
-		return false
+		return field.Invalid(fp, ver, err.Error())
 	}
-	return conduitVerConstraint.Check(v)
+
+	if ok := conduitVerConstraint.Check(v); !ok {
+		return field.Invalid(fp, ver, fmt.Sprintf(
+			"unsupported conduit version %q, minimum required %q", ver, v1alpha.ConduitEarliestAvailable,
+		))
+	}
+
+	return nil
 }
 
-func (*ConduitCustomValidator) validateRegistry(sr *v1alpha.SchemaRegistry) error {
+func (*ConduitCustomValidator) validateRegistry(sr *v1alpha.SchemaRegistry) *field.Error {
 	if sr == nil || sr.URL == "" {
 		return nil
 	}
 
 	if _, err := url.Parse(sr.URL); err != nil {
-		return fmt.Errorf("failed to validate registry url: %w", err)
+		return field.Invalid(
+			field.NewPath("spec").Child("schemaRegistry").Child("url"),
+			sr.URL,
+			err.Error(),
+		)
 	}
 
 	return nil
