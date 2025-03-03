@@ -28,10 +28,23 @@ func Test_ForVersion(t *testing.T) {
 			},
 		},
 		{
-			name:    "with version more than 0.12",
+			name:    "with version of 0.12",
 			version: "v0.12.0",
 			want: []string{
 				"/app/conduit",
+				"--pipelines.path", "/conduit.pipelines/pipeline.yaml",
+				"--connectors.path", "/conduit.storage/connectors",
+				"--db.type", "sqlite",
+				"--db.sqlite.path", "/conduit.storage/db",
+				"--pipelines.exit-on-degraded",
+				"--processors.path", "/conduit.storage/processors",
+			},
+		},
+		{
+			name:    "with version greater than 0.12",
+			version: "v0.13.0",
+			want: []string{
+				"/app/conduit run",
 				"--pipelines.path", "/conduit.pipelines/pipeline.yaml",
 				"--connectors.path", "/conduit.storage/connectors",
 				"--db.type", "sqlite",

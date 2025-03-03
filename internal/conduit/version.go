@@ -26,17 +26,29 @@ func NewFlags(fns ...func(*Args)) *Flags {
 }
 
 func (f *Flags) ForVersion(ver string) []string {
-	verConstraint, _ := semver.NewConstraint("< 0.12.0")
+	constraints := map[string]string{
+		"v011": "< 0.12.0",
+		"v012": ">= 0.12.0, < 0.13.0",
+	}
+
 	sanitized, _ := strings.CutPrefix(ver, "v")
 	v, _ := semver.NewVersion(sanitized)
 
-	if verConstraint.Check(v) {
-		return f.version011()
+	for key, rule := range constraints {
+		c, _ := semver.NewConstraint(rule)
+		if c.Check(v) {
+			switch key {
+			case "v011":
+				return f.v011()
+			case "v012":
+				return f.v012()
+			}
+		}
 	}
-	return f.version012()
+	return f.v013()
 }
 
-func (f *Flags) version011() []string {
+func (f *Flags) v011() []string {
 	return []string{
 		"/app/conduit",
 		"-pipelines.path", f.args.PipelineFile,
@@ -48,9 +60,21 @@ func (f *Flags) version011() []string {
 	}
 }
 
-func (f *Flags) version012() []string {
+func (f *Flags) v012() []string {
 	return []string{
 		"/app/conduit",
+		"--pipelines.path", f.args.PipelineFile,
+		"--connectors.path", f.args.ConnectorsPath,
+		"--db.type", "sqlite",
+		"--db.sqlite.path", f.args.DBPath,
+		"--pipelines.exit-on-degraded",
+		"--processors.path", f.args.ProcessorsPath,
+	}
+}
+
+func (f *Flags) v013() []string {
+	return []string{
+		"/app/conduit run",
 		"--pipelines.path", f.args.PipelineFile,
 		"--connectors.path", f.args.ConnectorsPath,
 		"--db.type", "sqlite",
