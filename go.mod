@@ -101,19 +101,17 @@ require (
 	github.com/charithe/durationcheck v0.0.10 // indirect
 	github.com/chavacava/garif v0.1.0 // indirect
 	github.com/ckaznocha/intrange v0.3.0 // indirect
-	github.com/conduitio/conduit-commons v0.5.1 // indirect
-	github.com/conduitio/conduit-connector-file v0.10.0 // indirect
-	github.com/conduitio/conduit-connector-generator v0.10.0 // indirect
-	github.com/conduitio/conduit-connector-kafka v0.12.0 // indirect
-	github.com/conduitio/conduit-connector-log v0.7.0 // indirect
-	github.com/conduitio/conduit-connector-postgres v0.11.0 // indirect
-	github.com/conduitio/conduit-connector-protocol v0.9.1 // indirect
-	github.com/conduitio/conduit-connector-s3 v0.9.0 // indirect
-	github.com/conduitio/conduit-connector-sdk v0.13.1 // indirect
-	github.com/conduitio/conduit-processor-sdk v0.4.1 // indirect
-	github.com/conduitio/conduit-schema-registry v0.2.3 // indirect
-	github.com/conduitio/evolviconf v0.1.0 // indirect
-	github.com/conduitio/evolviconf/evolviyaml v0.1.0 // indirect
+	github.com/conduitio/conduit-commons v0.5.0 // indirect
+	github.com/conduitio/conduit-connector-file v0.9.0 // indirect
+	github.com/conduitio/conduit-connector-generator v0.9.1 // indirect
+	github.com/conduitio/conduit-connector-kafka v0.11.1 // indirect
+	github.com/conduitio/conduit-connector-log v0.6.0 // indirect
+	github.com/conduitio/conduit-connector-postgres v0.10.1 // indirect
+	github.com/conduitio/conduit-connector-protocol v0.9.0 // indirect
+	github.com/conduitio/conduit-connector-s3 v0.8.1 // indirect
+	github.com/conduitio/conduit-connector-sdk v0.12.0 // indirect
+	github.com/conduitio/conduit-processor-sdk v0.4.0 // indirect
+	github.com/conduitio/conduit-schema-registry v0.2.2 // indirect
 	github.com/containerd/cgroups/v3 v3.0.5 // indirect
 	github.com/containerd/containerd v1.7.25 // indirect
 	github.com/containerd/continuity v0.4.5 // indirect
@@ -318,9 +316,6 @@ require (
 	github.com/ryanrolds/sqlclosecheck v0.5.1 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
-	github.com/samber/lo v1.47.0 // indirect
-	github.com/samber/slog-common v0.18.1 // indirect
-	github.com/samber/slog-zerolog/v2 v2.7.3 // indirect
 	github.com/sanposhiho/wastedassign/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.1 // indirect
 	github.com/sashamelentyev/interfacebloat v1.1.0 // indirect
