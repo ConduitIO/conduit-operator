@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/conduitio/conduit-operator/api/v1alpha"
-	"github.com/conduitio/conduit-operator/pkg/conduit"
+	"github.com/conduitio/conduit-operator/internal/conduit"
 	"github.com/matryer/is"
 )
 
