@@ -339,6 +339,12 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 			})
 		}
 
+		// fmt.Printf("version %s", c.Spec.Version)
+		container, err := ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, envVars)
+		if err != nil {
+			return err
+		}
+
 		spec := appsv1.DeploymentSpec{
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType,
@@ -351,7 +357,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 					RestartPolicy:  corev1.RestartPolicyAlways,
 					InitContainers: ConduitInitContainers(c.Spec.Connectors),
 					Containers: []corev1.Container{
-						ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, envVars),
+						container,
 					},
 					Volumes: []corev1.Volume{
 						ConduitVolume(nn.Name),

@@ -6,6 +6,7 @@ import (
 	"github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/conduit"
 	"github.com/matryer/is"
+	"github.com/pkg/errors"
 )
 
 func Test_ForVersion(t *testing.T) {
@@ -13,6 +14,7 @@ func Test_ForVersion(t *testing.T) {
 		name    string
 		version string
 		want    []string
+		wantErr error
 	}{
 		{
 			name:    "with version less than 0.12",
@@ -51,6 +53,12 @@ func Test_ForVersion(t *testing.T) {
 				"--processors.path", "/conduit.storage/processors",
 			},
 		},
+		{
+			name:    "with an unsupported version",
+			version: "v0.14.0",
+			want:    nil,
+			wantErr: errors.Errorf("Version v0.14.0 not supported"),
+		},
 	}
 
 	for _, tc := range tests {
@@ -63,8 +71,11 @@ func Test_ForVersion(t *testing.T) {
 				conduit.WithDBPath(v1alpha.ConduitDBPath),
 				conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
 			)
-			args := flags.ForVersion(tc.version)
+			args, err := flags.ForVersion(tc.version)
 
+			if err != nil {
+				is.Equal(tc.wantErr.Error(), err.Error())
+			}
 			is.Equal(args, tc.want)
 		})
 	}

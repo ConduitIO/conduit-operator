@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/matryer/is"
+	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -190,7 +192,7 @@ func Test_ConduitInitContainers(t *testing.T) {
 }
 
 func Test_ConduitRuntimeContainer(t *testing.T) {
-	want := corev1.Container{
+	runtimeContainer := corev1.Container{
 		Name:            "conduit-server",
 		Image:           "my-image:v0.11.1",
 		ImagePullPolicy: corev1.PullAlways,
@@ -252,21 +254,52 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 		},
 	}
 
-	got := ConduitRuntimeContainer(
-		"my-image",
-		"v0.11.1",
-		[]corev1.EnvVar{
-			{
-				Name:  "var-1",
-				Value: "val-1",
-			},
-			{
-				Name:  "var-2",
-				Value: "val-2",
-			},
+	tests := []struct {
+		name    string
+		version string
+		want    corev1.Container
+		wantErr error
+	}{
+		{
+			name:    "runtime container is created",
+			version: "v0.11.1",
+			want:    runtimeContainer,
+			wantErr: nil,
 		},
-	)
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Fatalf("container mismatch (-want +got): %v", diff)
+		{
+			name:    "error occurs creating runtime container",
+			version: "v0.14.0",
+			want:    corev1.Container{},
+			wantErr: errors.Errorf("Version v0.14.0 not supported"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			is := is.New(t)
+
+			got, err := ConduitRuntimeContainer(
+				"my-image",
+				tc.version,
+				[]corev1.EnvVar{
+					{
+						Name:  "var-1",
+						Value: "val-1",
+					},
+					{
+						Name:  "var-2",
+						Value: "val-2",
+					},
+				},
+			)
+
+			if err != nil {
+				is.Equal(tc.wantErr.Error(), err.Error())
+			}
+
+			if diff := cmp.Diff(tc.want, got); diff != "" {
+				t.Fatalf("container mismatch (-want +got): %v", diff)
+			}
+		})
 	}
 }
