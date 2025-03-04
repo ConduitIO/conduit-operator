@@ -49,7 +49,7 @@ func (f *Flags) ForVersion(ver string) ([]string, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("Version %s not supported", ver)
+	return nil, fmt.Errorf("version %s not supported", ver)
 }
 
 func (f *Flags) v011() []string {

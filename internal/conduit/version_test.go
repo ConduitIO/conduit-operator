@@ -57,7 +57,7 @@ func Test_ForVersion(t *testing.T) {
 			name:    "with an unsupported version",
 			version: "v0.14.0",
 			want:    nil,
-			wantErr: errors.Errorf("Version v0.14.0 not supported"),
+			wantErr: errors.Errorf("version v0.14.0 not supported"),
 		},
 	}
 

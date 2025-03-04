@@ -270,7 +270,7 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 			name:    "error occurs creating runtime container",
 			version: "v0.14.0",
 			want:    corev1.Container{},
-			wantErr: errors.Errorf("Version v0.14.0 not supported"),
+			wantErr: errors.Errorf("version v0.14.0 not supported"),
 		},
 	}
 
