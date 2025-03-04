@@ -1,6 +1,7 @@
 package conduit
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -25,10 +26,11 @@ func NewFlags(fns ...func(*Args)) *Flags {
 	return &Flags{args: &args}
 }
 
-func (f *Flags) ForVersion(ver string) []string {
+func (f *Flags) ForVersion(ver string) ([]string, error) {
 	constraints := map[string]string{
-		"v011": "< 0.12.0",
-		"v012": ">= 0.12.0, < 0.13.0",
+		"v011": "~0.11.1",
+		"v012": "~0.12.x",
+		"v013": "~0.13.x",
 	}
 
 	sanitized, _ := strings.CutPrefix(ver, "v")
@@ -39,13 +41,15 @@ func (f *Flags) ForVersion(ver string) []string {
 		if c.Check(v) {
 			switch key {
 			case "v011":
-				return f.v011()
+				return f.v011(), nil
 			case "v012":
-				return f.v012()
+				return f.v012(), nil
+			case "v013":
+				return f.v013(), nil
 			}
 		}
 	}
-	return f.v013()
+	return nil, fmt.Errorf("Version %s not supported", ver)
 }
 
 func (f *Flags) v011() []string {

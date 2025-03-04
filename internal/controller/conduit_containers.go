@@ -131,15 +131,17 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 }
 
 // ConduitRuntimeContainer returns a Kubernetes container definition
-// todo is the pipelineName supposed to be used?
-func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) corev1.Container {
+func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) (corev1.Container, error) {
 	flags := conduit.NewFlags(
 		conduit.WithPipelineFile(v1alpha.ConduitPipelineFile),
 		conduit.WithConnectorsPath(v1alpha.ConduitConnectorsPath),
 		conduit.WithDBPath(v1alpha.ConduitDBPath),
 		conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
 	)
-	args := flags.ForVersion(version)
+	args, err := flags.ForVersion(version)
+	if err != nil {
+		return corev1.Container{}, err
+	}
 
 	return corev1.Container{
 		Name:            v1alpha.ConduitContainerName,
@@ -184,5 +186,5 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) cor
 			},
 		},
 		Env: envVars,
-	}
+	}, nil
 }
