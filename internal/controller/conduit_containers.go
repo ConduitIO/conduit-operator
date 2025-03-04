@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit-operator/internal/conduit"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -130,22 +131,23 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 }
 
 // ConduitRuntimeContainer returns a Kubernetes container definition
-// todo is the pipelineName supposed to be used?
-func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) corev1.Container {
-	args := []string{
-		"/app/conduit",
-		"-pipelines.path", v1alpha.ConduitPipelineFile,
-		"-connectors.path", v1alpha.ConduitConnectorsPath,
-		"-db.type", "sqlite",
-		"-db.sqlite.path", v1alpha.ConduitDBPath,
-		"-pipelines.exit-on-error",
-		"-processors.path", v1alpha.ConduitProcessorsPath,
+func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) (corev1.Container, error) {
+	flags := conduit.NewFlags(
+		conduit.WithPipelineFile(v1alpha.ConduitPipelineFile),
+		conduit.WithConnectorsPath(v1alpha.ConduitConnectorsPath),
+		conduit.WithDBPath(v1alpha.ConduitDBPath),
+		conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
+	)
+	args, err := flags.ForVersion(version)
+	if err != nil {
+		return corev1.Container{}, err
 	}
 
 	return corev1.Container{
 		Name:            v1alpha.ConduitContainerName,
 		Image:           fmt.Sprint(image, ":", version),
 		ImagePullPolicy: corev1.PullAlways,
+		Command:         []string{"/app/conduit"},
 		Args:            args,
 		Ports: []corev1.ContainerPort{
 			{
@@ -184,5 +186,5 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) cor
 			},
 		},
 		Env: envVars,
-	}
+	}, nil
 }
