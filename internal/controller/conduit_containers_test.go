@@ -194,8 +194,8 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 		Name:            "conduit-server",
 		Image:           "my-image:v0.11.1",
 		ImagePullPolicy: corev1.PullAlways,
+		Command:         []string{"/app/conduit"},
 		Args: []string{
-			"/app/conduit",
 			"-pipelines.path", "/conduit.pipelines/pipeline.yaml",
 			"-connectors.path", "/conduit.storage/connectors",
 			"-db.type", "sqlite",

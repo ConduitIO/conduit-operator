@@ -18,7 +18,6 @@ func Test_ForVersion(t *testing.T) {
 			name:    "with version less than 0.12",
 			version: "v0.11.1",
 			want: []string{
-				"/app/conduit",
 				"-pipelines.path", "/conduit.pipelines/pipeline.yaml",
 				"-connectors.path", "/conduit.storage/connectors",
 				"-db.type", "sqlite",
@@ -31,7 +30,6 @@ func Test_ForVersion(t *testing.T) {
 			name:    "with version of 0.12",
 			version: "v0.12.0",
 			want: []string{
-				"/app/conduit",
 				"--pipelines.path", "/conduit.pipelines/pipeline.yaml",
 				"--connectors.path", "/conduit.storage/connectors",
 				"--db.type", "sqlite",
@@ -44,7 +42,7 @@ func Test_ForVersion(t *testing.T) {
 			name:    "with version greater than 0.12",
 			version: "v0.13.0",
 			want: []string{
-				"/app/conduit run",
+				"run",
 				"--pipelines.path", "/conduit.pipelines/pipeline.yaml",
 				"--connectors.path", "/conduit.storage/connectors",
 				"--db.type", "sqlite",
