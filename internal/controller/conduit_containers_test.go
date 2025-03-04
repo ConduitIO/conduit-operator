@@ -292,7 +292,6 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 					},
 				},
 			)
-
 			if err != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			}

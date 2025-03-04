@@ -72,7 +72,6 @@ func Test_ForVersion(t *testing.T) {
 				conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
 			)
 			args, err := flags.ForVersion(tc.version)
-
 			if err != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			}
