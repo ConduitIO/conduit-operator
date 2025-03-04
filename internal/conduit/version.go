@@ -37,7 +37,10 @@ func (f *Flags) ForVersion(ver string) ([]string, error) {
 	v, _ := semver.NewVersion(sanitized)
 
 	for key, rule := range constraints {
-		c, _ := semver.NewConstraint(rule)
+		c, err := semver.NewConstraint(rule)
+		if err != nil {
+			return nil, fmt.Errorf("parse error occured while creating constraint: %w", err)
+		}
 		if c.Check(v) {
 			switch key {
 			case "v011":
