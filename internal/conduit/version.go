@@ -50,7 +50,6 @@ func (f *Flags) ForVersion(ver string) []string {
 
 func (f *Flags) v011() []string {
 	return []string{
-		"/app/conduit",
 		"-pipelines.path", f.args.PipelineFile,
 		"-connectors.path", f.args.ConnectorsPath,
 		"-db.type", "sqlite",
@@ -62,7 +61,6 @@ func (f *Flags) v011() []string {
 
 func (f *Flags) v012() []string {
 	return []string{
-		"/app/conduit",
 		"--pipelines.path", f.args.PipelineFile,
 		"--connectors.path", f.args.ConnectorsPath,
 		"--db.type", "sqlite",
@@ -74,7 +72,7 @@ func (f *Flags) v012() []string {
 
 func (f *Flags) v013() []string {
 	return []string{
-		"/app/conduit run",
+		"run",
 		"--pipelines.path", f.args.PipelineFile,
 		"--connectors.path", f.args.ConnectorsPath,
 		"--db.type", "sqlite",

@@ -145,6 +145,7 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) cor
 		Name:            v1alpha.ConduitContainerName,
 		Image:           fmt.Sprint(image, ":", version),
 		ImagePullPolicy: corev1.PullAlways,
+		Command:         []string{"/app/conduit"},
 		Args:            args,
 		Ports: []corev1.ContainerPort{
 			{
