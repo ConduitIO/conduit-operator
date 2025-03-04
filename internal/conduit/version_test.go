@@ -41,6 +41,18 @@ func Test_ForVersion(t *testing.T) {
 			},
 		},
 		{
+			name:    "with a patched version of 0.12",
+			version: "v0.12.4",
+			want: []string{
+				"--pipelines.path", "/conduit.pipelines/pipeline.yaml",
+				"--connectors.path", "/conduit.storage/connectors",
+				"--db.type", "sqlite",
+				"--db.sqlite.path", "/conduit.storage/db",
+				"--pipelines.exit-on-degraded",
+				"--processors.path", "/conduit.storage/processors",
+			},
+		},
+		{
 			name:    "with version greater than 0.12",
 			version: "v0.13.0",
 			want: []string{
