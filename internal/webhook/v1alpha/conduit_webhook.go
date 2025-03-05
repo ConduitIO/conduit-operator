@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	internalconduit "github.com/conduitio/conduit-operator/internal/conduit"
 )
 
 var conduitVerConstraint *semver.Constraints
@@ -106,21 +108,23 @@ func (d *ConduitCustomDefaulter) Default(_ context.Context, obj runtime.Object) 
 
 		d.proccessorDefaulter(c.Processors)
 
-		c.Plugin = strings.ToLower(c.Plugin)
-
-		if strings.HasPrefix(c.Plugin, "builtin:") {
-			c.PluginName = c.Plugin
-			continue
-		}
-
 		if c.PluginVersion == "" {
 			c.PluginVersion = "latest"
 		}
 
-		pluginName := strings.TrimPrefix(filepath.Base(c.Plugin), "conduit-connector-")
+		plugin := strings.ToLower(c.Plugin)
 
-		c.PluginPkg = fmt.Sprintf("github.com/%s/cmd/connector@%s", c.Plugin, c.PluginVersion)
-		c.PluginName = fmt.Sprintf("standalone:%s", pluginName)
+		switch {
+		case slices.Contains(internalconduit.BuiltinConnectors, plugin):
+			c.Plugin = "builtin:" + plugin
+			c.PluginName = c.Plugin
+		case strings.HasPrefix(plugin, "builtin:"):
+			c.PluginName = c.Plugin
+		default:
+			pluginName := strings.TrimPrefix(filepath.Base(c.Plugin), "conduit-connector-")
+			c.PluginPkg = fmt.Sprintf("github.com/%s/cmd/connector@%s", c.Plugin, c.PluginVersion)
+			c.PluginName = fmt.Sprintf("standalone:%s", pluginName)
+		}
 	}
 
 	d.proccessorDefaulter(conduit.Spec.Processors)

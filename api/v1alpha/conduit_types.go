@@ -29,6 +29,7 @@ const (
 	PendingReason  = "Pending"
 	VolBoundReason = "VolumeBound"
 	DeletedReason  = "Deleted"
+	DegradedReason = "Degraded"
 )
 
 var ConduitConditions = NewConditionSet(

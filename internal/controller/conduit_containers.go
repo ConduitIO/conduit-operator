@@ -171,7 +171,7 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) (co
 			},
 			TimeoutSeconds:   1,
 			PeriodSeconds:    10,
-			SuccessThreshold: 1,
+			SuccessThreshold: 3,
 			FailureThreshold: 3,
 		},
 		VolumeMounts: []corev1.VolumeMount{
