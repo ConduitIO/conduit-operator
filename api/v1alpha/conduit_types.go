@@ -41,7 +41,7 @@ var ConduitConditions = NewConditionSet(
 )
 
 const (
-	ConduitVersion             = "v0.11.1"
+	ConduitVersion             = "v0.13.2"
 	ConduitImage               = "ghcr.io/conduitio/conduit"
 	ConduitContainerName       = "conduit-server"
 	ConduitPipelinePath        = "/conduit.pipelines"
@@ -57,7 +57,7 @@ const (
 
 var (
 	ConduitPipelineFile      = path.Join(ConduitPipelinePath, "pipeline.yaml")
-	ConduitEarliestAvailable = "v0.11.1"
+	ConduitEarliestAvailable = "v0.13.2"
 )
 
 // ConduitSpec defines the desired state of Conduit
