@@ -1,8 +1,6 @@
 module github.com/conduitio/conduit-operator
 
-go 1.24
-
-toolchain go1.24.0
+go 1.23.6
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
@@ -305,7 +303,7 @@ require (
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/rs/zerolog v1.33.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/ryancurrah/gomodguard v1.4.0 // indirect
+	github.com/ryancurrah/gomodguard v1.3.5 // indirect
 	github.com/ryanrolds/sqlclosecheck v0.5.1 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
