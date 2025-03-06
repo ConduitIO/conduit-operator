@@ -2,6 +2,7 @@ package conduit
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -16,12 +17,20 @@ var forbiddenConnectors = []string{
 	"conduitio/conduit-connector-file",
 }
 
+var BuiltinConnectors = []string{
+	KafkaPlugin,
+	GeneratorPlugin,
+	S3Plugin,
+	PostgresPlugin,
+	LogPlugin,
+}
+
 const (
-	KafkaPlugin     = "builtin:kafka"
-	GeneratorPlugin = "builtin:generator"
-	S3Plugin        = "builtin:s3"
-	PostgresPlugin  = "builtin:postgres"
-	LogPlugin       = "builtin:log"
+	KafkaPlugin     = "kafka"
+	GeneratorPlugin = "generator"
+	S3Plugin        = "s3"
+	PostgresPlugin  = "postgres"
+	LogPlugin       = "log"
 
 	sourceConnector = "source"
 	destConnector   = "destination"
@@ -33,14 +42,10 @@ const (
 func ValidatePlugin(name string) error {
 	trimmedName := strings.ToLower(strings.Trim(name, " "))
 
-	switch trimmedName {
-	case
-		KafkaPlugin,
-		GeneratorPlugin,
-		S3Plugin,
-		PostgresPlugin,
-		LogPlugin:
-
+	if slices.Contains(
+		BuiltinConnectors,
+		strings.TrimPrefix(trimmedName, "builtin:"),
+	) {
 		return nil
 	}
 

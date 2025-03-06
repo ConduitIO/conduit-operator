@@ -33,6 +33,12 @@ import (
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Log levels
+const (
+	Info = iota
+	Debug
+)
+
 // ConduitReconciler reconciles a Conduit object
 type ConduitReconciler struct {
 	Metadata *v1.ConduitInstanceMetadata
@@ -381,33 +387,35 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		status := deployment.Status
 		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, *spec.Replicas)
 
-		runningStatus := r.deploymentRunningStatus(&deployment)
+		runningStatus, reason := r.deploymentRunningStatus(&deployment)
+
+		r.Logger.V(Debug).Info("deployment status", "deployment", deployment.Name, "status", runningStatus, "reason", reason)
 
 		switch runningStatus {
 		case corev1.ConditionTrue:
 			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
-				r.Eventf(c, corev1.EventTypeNormal, v1.RunningReason, "Conduit deployment %q running, config %q", nn, cm.ResourceVersion)
+				r.Eventf(c, corev1.EventTypeNormal, reason, "Conduit deployment %q running, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
 				runningStatus,
-				"DeploymentReady",
+				reason,
 				readyReplicas,
 			)
 		case corev1.ConditionFalse:
 			if c.Status.ConditionChanged(v1.ConditionConduitDeploymentRunning, runningStatus) {
-				r.Eventf(c, corev1.EventTypeNormal, v1.StoppedReason, "Conduit deployment %q stopped, config %q", nn, cm.ResourceVersion)
+				r.Eventf(c, corev1.EventTypeNormal, reason, "Conduit deployment %q stopped, config %q", nn, cm.ResourceVersion)
 			}
 
 			c.Status.SetCondition(
 				v1.ConditionConduitDeploymentRunning,
 				runningStatus,
-				"DeploymentReady",
+				reason,
 				readyReplicas,
 			)
 		default:
-			r.Eventf(c, corev1.EventTypeNormal, v1.PendingReason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
+			r.Eventf(c, corev1.EventTypeNormal, reason, "Conduit deployment %q pending, config %q", nn, cm.ResourceVersion)
 		}
 
 		return ctrlutil.SetControllerReference(c, &deployment, r.Scheme())
@@ -545,19 +553,33 @@ func (r *ConduitReconciler) getReplicas(c *v1.Conduit) int32 {
 	return 0
 }
 
-func (r *ConduitReconciler) deploymentRunningStatus(d *appsv1.Deployment) corev1.ConditionStatus {
+func (r *ConduitReconciler) deploymentRunningStatus(d *appsv1.Deployment) (corev1.ConditionStatus, string) {
+	r.Logger.V(Debug).Info("deployment status",
+		"deployment", d.Name,
+		"replicas", d.Status.Replicas,
+		"ready_replicas", d.Status.ReadyReplicas,
+		"updated_replicas", d.Status.UpdatedReplicas,
+		"available_replicas", d.Status.AvailableReplicas,
+		"unavailable_replicas", d.Status.UnavailableReplicas,
+	)
+
 	// When the deployment is scaled down, return not running (false)
 	if *d.Spec.Replicas == 0 {
-		return corev1.ConditionFalse
+		return corev1.ConditionFalse, v1.StoppedReason
 	}
 
-	i := slices.IndexFunc(d.Status.Conditions, func(c appsv1.DeploymentCondition) bool {
-		return c.Type == appsv1.DeploymentAvailable
-	})
-	if i < 0 {
-		r.Logger.Info("failed to find deployment status condition, default to unknown", "deployment", d.Name)
-		return corev1.ConditionUnknown
+	// Status has not been updated yet.
+	if d.Status.Replicas == 0 {
+		return corev1.ConditionUnknown, v1.PendingReason
 	}
 
-	return d.Status.Conditions[i].Status
+	if d.Status.ReadyReplicas >= d.Status.Replicas {
+		return corev1.ConditionTrue, v1.RunningReason
+	}
+
+	if d.Status.UnavailableReplicas >= d.Status.Replicas {
+		return corev1.ConditionFalse, v1.DegradedReason
+	}
+
+	return corev1.ConditionUnknown, v1.PendingReason
 }

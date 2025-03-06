@@ -169,10 +169,11 @@ func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) (co
 					Port:   intstr.FromString("http"),
 				},
 			},
-			TimeoutSeconds:   1,
-			PeriodSeconds:    10,
-			SuccessThreshold: 1,
-			FailureThreshold: 3,
+			InitialDelaySeconds: 5,
+			TimeoutSeconds:      1,
+			PeriodSeconds:       10,
+			SuccessThreshold:    1,
+			FailureThreshold:    3,
 		},
 		VolumeMounts: []corev1.VolumeMount{
 			{
