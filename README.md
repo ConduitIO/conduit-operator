@@ -185,7 +185,7 @@ Changes to the operator can be deployed to the kind cluster via `make dev`
 
 ## Scaffolding 
 
-The project scaffolding was generated using [Kubebuilder](https://book.kubebuilder.io), using the follow commands:
+The project scaffolding was generated using [Kubebuilder](https://book.kubebuilder.io), using the following commands:
 
 ```
 kubebuilder init --domain conduit.io --plugins=go.kubebuilder.io/v4 --project-version 3 --project-name conduit-operator
