@@ -200,7 +200,7 @@ func main() {
 		fatal(err, "failed to load conduit instance metadata", "file", metadataFile)
 	}
 
-	if err = (&controller.ConduitReconciler{
+	if err := (&controller.ConduitReconciler{
 		Metadata:      meta,
 		Client:        mgr.GetClient(),
 		Logger:        ctrl.Log.WithName("controller").WithName("conduit"),

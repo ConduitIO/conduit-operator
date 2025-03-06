@@ -33,6 +33,12 @@ import (
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Log levels
+const (
+	Info = iota
+	Debug
+)
+
 // ConduitReconciler reconciles a Conduit object
 type ConduitReconciler struct {
 	Metadata *v1.ConduitInstanceMetadata
@@ -381,9 +387,9 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		status := deployment.Status
 		readyReplicas := fmt.Sprintf("%d/%d", status.ReadyReplicas, *spec.Replicas)
 
-		runningStatus, reason := r.deploymentRunningStatus(ctx, &deployment)
+		runningStatus, reason := r.deploymentRunningStatus(&deployment)
 
-		r.Logger.Info("deployment status", "deployment", deployment.Name, "status", runningStatus, "reason", reason)
+		r.Logger.V(Debug).Info("deployment status", "deployment", deployment.Name, "status", runningStatus, "reason", reason)
 
 		switch runningStatus {
 		case corev1.ConditionTrue:
@@ -547,68 +553,33 @@ func (r *ConduitReconciler) getReplicas(c *v1.Conduit) int32 {
 	return 0
 }
 
-func (r *ConduitReconciler) deploymentRunningStatus(ctx context.Context, d *appsv1.Deployment) (corev1.ConditionStatus, string) {
+func (r *ConduitReconciler) deploymentRunningStatus(d *appsv1.Deployment) (corev1.ConditionStatus, string) {
+	r.Logger.V(Debug).Info("deployment status",
+		"deployment", d.Name,
+		"replicas", d.Status.Replicas,
+		"ready_replicas", d.Status.ReadyReplicas,
+		"updated_replicas", d.Status.UpdatedReplicas,
+		"available_replicas", d.Status.AvailableReplicas,
+		"unavailable_replicas", d.Status.UnavailableReplicas,
+	)
+
 	// When the deployment is scaled down, return not running (false)
 	if *d.Spec.Replicas == 0 {
 		return corev1.ConditionFalse, v1.StoppedReason
 	}
 
-	i := slices.IndexFunc(d.Status.Conditions, func(c appsv1.DeploymentCondition) bool {
-		return c.Type == appsv1.DeploymentAvailable
-	})
-	if i < 0 {
-		r.Logger.Info("failed to find deployment status condition, default to unknown", "deployment", d.Name)
+	// Status has not been updated yet.
+	if d.Status.Replicas == 0 {
 		return corev1.ConditionUnknown, v1.PendingReason
 	}
 
-	containerStatus := r.conduitContainerStatus(ctx, d.Name)
-	if containerStatus == nil {
-		return corev1.ConditionUnknown, v1.PendingReason
+	if d.Status.ReadyReplicas >= d.Status.Replicas {
+		return corev1.ConditionTrue, v1.RunningReason
 	}
 
-	r.Logger.Info("container status",
-		"restart_count", containerStatus.RestartCount,
-		"ready", containerStatus.Ready,
-		"deployment", d.Name,
-	)
-
-	// pod is restarting, likely due to crashes
-	if containerStatus.RestartCount > 3 && !containerStatus.Ready {
-		return d.Status.Conditions[i].Status, v1.DegradedReason
+	if d.Status.UnavailableReplicas >= d.Status.Replicas {
+		return corev1.ConditionFalse, v1.DegradedReason
 	}
 
-	return d.Status.Conditions[i].Status, v1.RunningReason
-}
-
-// conduitContainerStatus returns the status of the conduit server container.
-// Returns nil when status is not avaiable.
-func (r *ConduitReconciler) conduitContainerStatus(ctx context.Context, deploymentName string) *corev1.ContainerStatus {
-	var pods corev1.PodList
-
-	if err := r.List(
-		ctx,
-		&pods,
-		client.MatchingLabels{"app.kubernetes.io/name": deploymentName},
-	); err != nil {
-		r.Logger.Error(err, "failed to list pods for deployment", "deployment", deploymentName)
-		return nil
-	}
-
-	if len(pods.Items) == 0 {
-		r.Logger.Info("deployment does not contain any pods", "deployment", deploymentName)
-		return nil
-	}
-
-	pod := pods.Items[0]
-
-	i := slices.IndexFunc(pod.Status.ContainerStatuses, func(c corev1.ContainerStatus) bool {
-		return c.Name == v1.ConduitContainerName
-	})
-
-	if i < 0 {
-		r.Logger.Info("pod missing container status", "deployment", deploymentName)
-		return nil
-	}
-
-	return &pod.Status.ContainerStatuses[i]
+	return corev1.ConditionUnknown, v1.PendingReason
 }
