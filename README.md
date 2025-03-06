@@ -179,8 +179,16 @@ Install the operator in the `conduit-operator` namespace of your cluster:
 helm install conduit-operator conduit/conduit-operator --create-namespace -n conduit-operator
 ```
 
-
-
 ## Development
 
 Changes to the operator can be deployed to the kind cluster via `make dev` 
+
+## Scaffolding 
+
+The project scaffolding was generated using [Kubebuilder](https://book.kubebuilder.io), using the following commands:
+
+```
+kubebuilder init --domain conduit.io --plugins=go.kubebuilder.io/v4 --project-version 3 --project-name conduit-operator
+kubebuilder create api --group operator --version v1alpha --kind Conduit
+kubebuilder create webhook --group operator --version v1alpha --kind Conduit --conversion --spoke v1alpha --defaulting --programmatic-validation
+```
