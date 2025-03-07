@@ -183,7 +183,7 @@ func (r *ConduitReconciler) CreateOrUpdateConfig(ctx context.Context, c *v1.Cond
 	return nil
 }
 
-// CreateOrUpdateConfig creates a secret which will be used by the conduit instance
+// CreateOrUpdateSecret creates a secret which will be used by the conduit instance
 // to store sensitive information (credentials, etc)
 func (r *ConduitReconciler) CreateOrUpdateSecret(ctx context.Context, c *v1.Conduit) error {
 	var (
@@ -345,7 +345,6 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 			})
 		}
 
-		// fmt.Printf("version %s", c.Spec.Version)
 		container, err := ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, envVars)
 		if err != nil {
 			return err
