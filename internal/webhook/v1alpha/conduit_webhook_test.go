@@ -41,3 +41,7 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 		})
 	}
 }
+
+func TestWebhookValidate_Connectors(t *testing.T) {
+
+}

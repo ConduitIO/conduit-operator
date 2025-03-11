@@ -1,10 +1,19 @@
 package v1alpha
 
 import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/conduitio/conduit-commons/config"
+	sdk "github.com/conduitio/conduit-connector-sdk"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/conduit"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+
+const baseURL = "https://conduit.io/connectors/github.com/ConduitIO"
 
 var connectorValidators = []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
 	validateConnectorPlugin,
@@ -30,4 +39,66 @@ func validateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field
 		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
 	return nil
+}
+
+func validateConnectorParams(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+	spec, err := getPluginParameters(c)
+	if err != nil {
+		return field.InternalError(fp.Child("parameter"), fmt.Errorf("failed getting plugin params from cache with error %w", err))
+	}
+
+	settings := make(map[string]string)
+	for _, v := range c.Settings {
+		settings[v.Name] = v.Value
+		// TODO: do secrets need to be handled differently?
+	}
+
+	// TODO ensure null case for params - can it handle empty list?
+	config := config.Config(settings)
+	err = config.Validate(spec().SourceParams)
+	if err != nil {
+		return field.Invalid(fp.Child("parameter"), c.Type, err.Error())
+	}
+	err = config.Validate(spec().DestinationParams)
+	if err != nil {
+		return field.Invalid(fp.Child("parameter"), c.Type, err.Error())
+	}
+
+	return nil
+}
+
+func getPluginParameters(c *v1alpha.ConduitConnector) (func() sdk.Specification, error) {
+	body, err := getCachedYaml(c)
+	if err != nil {
+		return func() sdk.Specification { return sdk.Specification{} }, err
+	}
+
+	return sdk.YAMLSpecification(body, c.PluginVersion), nil
+}
+
+func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
+	// TODO make sure %40 encoding for @ works
+	connectorURL := fmt.Sprintf("%s/%s%%40%s/connector.yaml", baseURL, c.PluginName, c.PluginVersion)
+
+	ctx := context.Background()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, connectorURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("error creating the http request %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error getting yaml from cache with error %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("error getting yaml, status code %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response body %w", err)
+	}
+	return string(body), nil
 }
