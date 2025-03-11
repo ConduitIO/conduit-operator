@@ -218,6 +218,9 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
+		err := validateConnectorParams(c, fp)
+		errs = append(errs, err)
+
 		for _, fn := range connectorValidators {
 			if err := fn(c, fp); err != nil {
 				errs = append(errs, err)
