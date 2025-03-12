@@ -194,17 +194,17 @@ func Test_ConduitInitContainers(t *testing.T) {
 func Test_ConduitRuntimeContainer(t *testing.T) {
 	runtimeContainer := corev1.Container{
 		Name:            "conduit-server",
-		Image:           "my-image:v0.11.1",
+		Image:           "my-image:v0.13.2",
 		ImagePullPolicy: corev1.PullAlways,
 		Command:         []string{"/app/conduit"},
 		Args: []string{
-			"-pipelines.path", "/conduit.pipelines/pipeline.yaml",
-			"-connectors.path", "/conduit.storage/connectors",
-			"-db.type", "sqlite",
-			"-db.sqlite.path", "/conduit.storage/db",
-			"-pipelines.exit-on-error",
-			"-processors.path",
-			"/conduit.storage/processors",
+			"run",
+			"--pipelines.path", "/conduit.pipelines/pipeline.yaml",
+			"--connectors.path", "/conduit.storage/connectors",
+			"--db.type", "sqlite",
+			"--db.sqlite.path", "/conduit.storage/db",
+			"--pipelines.exit-on-degraded",
+			"--processors.path", "/conduit.storage/processors",
 		},
 		Ports: []corev1.ContainerPort{
 			{
@@ -263,7 +263,7 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 	}{
 		{
 			name:    "runtime container is created",
-			version: "v0.11.1",
+			version: "v0.13.2",
 			want:    runtimeContainer,
 			wantErr: nil,
 		},
