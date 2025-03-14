@@ -164,8 +164,9 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "source connector parameters are valid",
 			setup: func() *v1alpha.ConduitConnector {
-				webClient, httpResp := setupHttpMock(t, true)
+				webClient, httpResp := setupHTTPMock(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
+				t.Cleanup(func() { httpResp.Body.Close() })
 
 				conduit := getSampleConduit(t, true)
 				return conduit.Spec.Connectors[0]
@@ -174,9 +175,10 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "destination connector parameters are valid",
 			setup: func() *v1alpha.ConduitConnector {
-				webClient, httpResp := setupHttpMock(t, true)
+				webClient, httpResp := setupHTTPMock(t)
 				httpClient = webClient
 				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
+				t.Cleanup(func() { httpResp.Body.Close() })
 
 				conduit := getSampleConduit(t, true)
 				return conduit.Spec.Connectors[1]
@@ -185,8 +187,9 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "error getting cached yaml",
 			setup: func() *v1alpha.ConduitConnector {
-				webClient, _ := setupHttpMock(t, false)
+				webClient, httpResp := setupHTTPMock(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM"))
+				t.Cleanup(func() { httpResp.Body.Close() })
 
 				conduit := getSampleConduit(t, true)
 				return conduit.Spec.Connectors[0]
@@ -198,7 +201,8 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		// would setting is inside the block fix the NoErr?
+		t.Run(tc.name, func(_ *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
 
@@ -293,7 +297,7 @@ func getSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	return c
 }
 
-func setupHttpMock(t *testing.T, wantSuccess bool) (*mock.MockHTTPClient, *http.Response) {
+func setupHTTPMock(t *testing.T) (*mock.MockHTTPClient, *http.Response) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -302,13 +306,6 @@ func setupHttpMock(t *testing.T, wantSuccess bool) (*mock.MockHTTPClient, *http.
 	mockResp := &http.Response{
 		StatusCode: 200,
 		Body:       io.NopCloser(strings.NewReader(connectorYAML)),
-	}
-
-	// TODO clean
-	if wantSuccess {
-		// webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
-	} else {
-
 	}
 
 	httpClient = mockClient
