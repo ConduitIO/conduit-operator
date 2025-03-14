@@ -2,14 +2,25 @@ package v1alpha
 
 import (
 	"context"
+	_ "embed"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit-operator/internal/webhook/v1alpha/mock"
+	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
+
+//go:embed testdata/connector-example.yaml
+var connectorYAML string
 
 func TestValidator_ConnectorPlugin(t *testing.T) {
 	tests := []struct {
@@ -20,13 +31,13 @@ func TestValidator_ConnectorPlugin(t *testing.T) {
 		{
 			name: "connector plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return createConduit(t, true)
+				return getSampleConduit(t, true)
 			},
 		},
 		{
 			name: "connector plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := createConduit(t, true)
+				c := getSampleConduit(t, true)
 				c.Spec.Connectors[0].Plugin = ""
 				return c
 			},
@@ -63,13 +74,13 @@ func TestValidator_ConnectorPluginType(t *testing.T) {
 		{
 			name: "connector plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return createConduit(t, true)
+				return getSampleConduit(t, true)
 			},
 		},
 		{
 			name: "connector plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := createConduit(t, true)
+				c := getSampleConduit(t, true)
 				c.Spec.Connectors[0].Type = ""
 				return c
 			},
@@ -106,13 +117,13 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 		{
 			name: "processor plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return createConduit(t, true)
+				return getSampleConduit(t, true)
 			},
 		},
 		{
 			name: "processor plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := createConduit(t, true)
+				c := getSampleConduit(t, true)
 				c.Spec.Processors[0].Plugin = ""
 				return c
 			},
@@ -139,8 +150,71 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 	}
 }
 
+func TestValidator_ConnectorParameters(t *testing.T) {
+	var (
+		is        = is.New(t)
+		errorPath = field.NewPath("spec").Child("connectors").Child("parameter")
+	)
+
+	tests := []struct {
+		name    string
+		setup   func() *v1alpha.ConduitConnector
+		wantErr error
+	}{
+		{
+			name: "source connector parameters are valid",
+			setup: func() *v1alpha.ConduitConnector {
+				webClient, httpResp := setupHttpMock(t, true)
+				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
+
+				conduit := getSampleConduit(t, true)
+				return conduit.Spec.Connectors[0]
+			},
+		},
+		{
+			name: "destination connector parameters are valid",
+			setup: func() *v1alpha.ConduitConnector {
+				webClient, httpResp := setupHttpMock(t, true)
+				httpClient = webClient
+				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
+
+				conduit := getSampleConduit(t, true)
+				return conduit.Spec.Connectors[1]
+			},
+		},
+		{
+			name: "error getting cached yaml",
+			setup: func() *v1alpha.ConduitConnector {
+				webClient, _ := setupHttpMock(t, false)
+				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM"))
+
+				conduit := getSampleConduit(t, true)
+				return conduit.Spec.Connectors[0]
+			},
+			wantErr: field.InternalError(
+				errorPath,
+				fmt.Errorf("failed getting plugin params from cache with error getting yaml from cache with error BOOM")),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c := tc.setup()
+			fp := field.NewPath("spec").Child("connectors")
+
+			err := validateConnectorParameters(c, fp)
+			if tc.wantErr != nil {
+				is.Equal(tc.wantErr.Error(), err.Error())
+			} else {
+				is.Equal(err, nil)
+				// is.NoErr(err)
+			}
+		})
+	}
+}
+
 // TODO using similar to controller -- should fix?
-func createConduit(t *testing.T, running bool) *v1alpha.Conduit {
+func getSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	t.Helper()
 
 	is := is.New(t)
@@ -162,21 +236,12 @@ func createConduit(t *testing.T, running bool) *v1alpha.Conduit {
 					Plugin: "builtin:generator",
 					Settings: []v1alpha.SettingsVar{
 						{
-							Name:  "setting1",
-							Value: "setting1-val",
+							Name:  "servers",
+							Value: "127.0.0.1",
 						},
 						{
-							Name:  "setting2",
-							Value: "setting2-val",
-						},
-						{
-							Name: "setting3",
-							SecretRef: &corev1.SecretKeySelector{
-								Key: "setting3-%s-key",
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "setting3-secret-name",
-								},
-							},
+							Name:  "topics",
+							Value: "input-topic",
 						},
 					},
 				},
@@ -186,13 +251,12 @@ func createConduit(t *testing.T, running bool) *v1alpha.Conduit {
 					Plugin: "builtin:file",
 					Settings: []v1alpha.SettingsVar{
 						{
-							Name: "setting2",
-							SecretRef: &corev1.SecretKeySelector{
-								Key: "setting2-#akey",
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "setting2-secret-name",
-								},
-							},
+							Name:  "servers",
+							Value: "127.0.0.1",
+						},
+						{
+							Name:  "topic",
+							Value: "output-topic",
 						},
 					},
 				},
@@ -227,4 +291,27 @@ func createConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	is.NoErr(defaulter.Default(context.Background(), c))
 
 	return c
+}
+
+func setupHttpMock(t *testing.T, wantSuccess bool) (*mock.MockHTTPClient, *http.Response) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock.NewMockHTTPClient(ctrl)
+
+	mockResp := &http.Response{
+		StatusCode: 200,
+		Body:       io.NopCloser(strings.NewReader(connectorYAML)),
+	}
+
+	// TODO clean
+	if wantSuccess {
+		// webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
+	} else {
+
+	}
+
+	httpClient = mockClient
+
+	return mockClient, mockResp
 }
