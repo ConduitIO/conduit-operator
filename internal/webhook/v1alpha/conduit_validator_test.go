@@ -176,7 +176,6 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			name: "destination connector parameters are valid",
 			setup: func() *v1alpha.ConduitConnector {
 				webClient, httpResp := setupHTTPMock(t)
-				httpClient = webClient
 				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
 				t.Cleanup(func() { httpResp.Body.Close() })
 
@@ -201,7 +200,6 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		// would setting is inside the block fix the NoErr?
 		t.Run(tc.name, func(_ *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
@@ -211,13 +209,11 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
 				is.Equal(err, nil)
-				// is.NoErr(err)
 			}
 		})
 	}
 }
 
-// TODO using similar to controller -- should fix?
 func setupSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	t.Helper()
 

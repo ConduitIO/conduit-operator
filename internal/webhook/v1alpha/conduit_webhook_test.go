@@ -61,7 +61,6 @@ func TestValidateCreate(t *testing.T) {
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
 				webClient, httpResp := setupHTTPMock(t)
-				httpClient = webClient
 				webClient.EXPECT().Do(gomock.Any()).DoAndReturn(func(_ *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode: 200,
@@ -77,7 +76,6 @@ func TestValidateCreate(t *testing.T) {
 			name: "error occurs",
 			setup: func() *v1alpha.Conduit {
 				webClient, httpResp := setupHTTPMock(t)
-				httpClient = webClient
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(2)
 				t.Cleanup(func() { httpResp.Body.Close() })
 
@@ -103,7 +101,6 @@ func TestValidateCreate(t *testing.T) {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
 			} else {
-				fmt.Printf("%v\n", err)
 				is.True(err == nil)
 			}
 		})
@@ -162,7 +159,6 @@ func TestValidateUpdate(t *testing.T) {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
 			} else {
-				fmt.Printf("%v\n", err)
 				is.True(err == nil)
 			}
 		})

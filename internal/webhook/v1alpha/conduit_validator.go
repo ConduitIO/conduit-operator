@@ -73,7 +73,7 @@ func validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *f
 	} else if c.Type == "destination" {
 		err = config.Validate(spec().DestinationParams)
 		if err != nil {
-			return field.Invalid(fp.Child("parameter"), c.Type, err.Error()) // this will print out source since the connector is source. Problem?
+			return field.Invalid(fp.Child("parameter"), c.Type, err.Error())
 		}
 	}
 
