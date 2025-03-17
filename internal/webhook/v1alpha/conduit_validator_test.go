@@ -31,13 +31,13 @@ func TestValidator_ConnectorPlugin(t *testing.T) {
 		{
 			name: "connector plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return getSampleConduit(t, true)
+				return setupSampleConduit(t, true)
 			},
 		},
 		{
 			name: "connector plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := getSampleConduit(t, true)
+				c := setupSampleConduit(t, true)
 				c.Spec.Connectors[0].Plugin = ""
 				return c
 			},
@@ -74,13 +74,13 @@ func TestValidator_ConnectorPluginType(t *testing.T) {
 		{
 			name: "connector plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return getSampleConduit(t, true)
+				return setupSampleConduit(t, true)
 			},
 		},
 		{
 			name: "connector plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := getSampleConduit(t, true)
+				c := setupSampleConduit(t, true)
 				c.Spec.Connectors[0].Type = ""
 				return c
 			},
@@ -117,13 +117,13 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 		{
 			name: "processor plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return getSampleConduit(t, true)
+				return setupSampleConduit(t, true)
 			},
 		},
 		{
 			name: "processor plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := getSampleConduit(t, true)
+				c := setupSampleConduit(t, true)
 				c.Spec.Processors[0].Plugin = ""
 				return c
 			},
@@ -168,7 +168,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
 				t.Cleanup(func() { httpResp.Body.Close() })
 
-				conduit := getSampleConduit(t, true)
+				conduit := setupSampleConduit(t, true)
 				return conduit.Spec.Connectors[0]
 			},
 		},
@@ -180,7 +180,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
 				t.Cleanup(func() { httpResp.Body.Close() })
 
-				conduit := getSampleConduit(t, true)
+				conduit := setupSampleConduit(t, true)
 				return conduit.Spec.Connectors[1]
 			},
 		},
@@ -191,7 +191,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM"))
 				t.Cleanup(func() { httpResp.Body.Close() })
 
-				conduit := getSampleConduit(t, true)
+				conduit := setupSampleConduit(t, true)
 				return conduit.Spec.Connectors[0]
 			},
 			wantErr: field.InternalError(
@@ -218,7 +218,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 }
 
 // TODO using similar to controller -- should fix?
-func getSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
+func setupSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	t.Helper()
 
 	is := is.New(t)
@@ -252,7 +252,7 @@ func getSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 				{
 					Name:   "destination-connector",
 					Type:   "destination",
-					Plugin: "builtin:file",
+					Plugin: "builtin:log",
 					Settings: []v1alpha.SettingsVar{
 						{
 							Name:  "servers",

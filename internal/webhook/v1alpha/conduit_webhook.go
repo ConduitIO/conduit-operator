@@ -182,7 +182,6 @@ func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 	}
 
 	if len(errs) > 0 {
-		// TODO should this be conduit.Spec.Name?
 		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
 	}
 
@@ -219,8 +218,9 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		err := validateConnectorParameters(c, fp)
-		errs = append(errs, err)
+		if paramErr := validateConnectorParameters(c, fp); paramErr != nil {
+			errs = append(errs, paramErr)
+		}
 
 		for _, fn := range connectorValidators {
 			if err := fn(c, fp); err != nil {
