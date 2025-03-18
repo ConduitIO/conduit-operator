@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 	"testing"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
@@ -51,7 +48,7 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	}
 }
 
-func TestValidateCreate(t *testing.T) {
+func TestWebhook_ValidateCreate(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func() *v1alpha.Conduit
@@ -60,14 +57,15 @@ func TestValidateCreate(t *testing.T) {
 		{
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
-				webClient, httpResp := setupHTTPMock(t)
-				webClient.EXPECT().Do(gomock.Any()).DoAndReturn(func(_ *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(strings.NewReader(connectorYAML)),
-					}, nil
-				}).Times(2)
-				t.Cleanup(func() { httpResp.Body.Close() })
+				webClient := setupHTTPMockClient(t)
+				//nolint:bodyclose
+				httpResps := getHTTPResps()
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+				)
 
 				return setupSampleConduit(t, true)
 			},
@@ -75,9 +73,8 @@ func TestValidateCreate(t *testing.T) {
 		{
 			name: "error occurs",
 			setup: func() *v1alpha.Conduit {
-				webClient, httpResp := setupHTTPMock(t)
-				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(2)
-				t.Cleanup(func() { httpResp.Body.Close() })
+				webClient := setupHTTPMockClient(t)
+				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
 				return setupSampleConduit(t, true)
 			},
@@ -107,7 +104,7 @@ func TestValidateCreate(t *testing.T) {
 	}
 }
 
-func TestValidateUpdate(t *testing.T) {
+func TestWebhook_ValidateUpdate(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func() *v1alpha.Conduit
@@ -116,15 +113,15 @@ func TestValidateUpdate(t *testing.T) {
 		{
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
-				webClient, httpResp := setupHTTPMock(t)
-				httpClient = webClient
-				webClient.EXPECT().Do(gomock.Any()).DoAndReturn(func(_ *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: 200,
-						Body:       io.NopCloser(strings.NewReader(connectorYAML)),
-					}, nil
-				}).Times(2)
-				t.Cleanup(func() { httpResp.Body.Close() })
+				webClient := setupHTTPMockClient(t)
+				//nolint:bodyclose
+				httpFnResps := getHTTPResps()
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[1]),
+				)
 
 				return setupSampleConduit(t, true)
 			},
@@ -132,10 +129,8 @@ func TestValidateUpdate(t *testing.T) {
 		{
 			name: "error occurs",
 			setup: func() *v1alpha.Conduit {
-				webClient, httpResp := setupHTTPMock(t)
-				httpClient = webClient
-				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(2)
-				t.Cleanup(func() { httpResp.Body.Close() })
+				webClient := setupHTTPMockClient(t)
+				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
 				return setupSampleConduit(t, true)
 			},

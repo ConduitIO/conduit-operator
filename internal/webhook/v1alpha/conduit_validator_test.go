@@ -1,6 +1,7 @@
 package v1alpha
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"errors"
@@ -150,6 +151,7 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 	}
 }
 
+//nolint:bodyclose // Body is closed in the validator, bodyclose is not recognizing this.
 func TestValidator_ConnectorParameters(t *testing.T) {
 	var (
 		is        = is.New(t)
@@ -164,33 +166,48 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "source connector parameters are valid",
 			setup: func() *v1alpha.ConduitConnector {
-				webClient, httpResp := setupHTTPMock(t)
-				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
-				t.Cleanup(func() { httpResp.Body.Close() })
-
 				conduit := setupSampleConduit(t, true)
+
+				webClient := setupHTTPMockClient(t)
+				httpResps := getHTTPResps()
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+				)
+
 				return conduit.Spec.Connectors[0]
 			},
 		},
 		{
 			name: "destination connector parameters are valid",
 			setup: func() *v1alpha.ConduitConnector {
-				webClient, httpResp := setupHTTPMock(t)
-				webClient.EXPECT().Do(gomock.Any()).Return(httpResp, nil)
-				t.Cleanup(func() { httpResp.Body.Close() })
-
 				conduit := setupSampleConduit(t, true)
+
+				webClient := setupHTTPMockClient(t)
+				httpResps := getHTTPResps()
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+				)
+
 				return conduit.Spec.Connectors[1]
 			},
 		},
 		{
 			name: "error getting cached yaml",
 			setup: func() *v1alpha.ConduitConnector {
-				webClient, httpResp := setupHTTPMock(t)
-				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM"))
-				t.Cleanup(func() { httpResp.Body.Close() })
-
 				conduit := setupSampleConduit(t, true)
+
+				webClient := setupHTTPMockClient(t)
+				httpResps := getHTTPResps()
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+				)
+
 				return conduit.Spec.Connectors[0]
 			},
 			wantErr: field.InternalError(
@@ -293,18 +310,37 @@ func setupSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	return c
 }
 
-func setupHTTPMock(t *testing.T) (*mock.MockHTTPClient, *http.Response) {
+func setupHTTPMockClient(t *testing.T) *mock.MockHTTPClient {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockClient := mock.NewMockHTTPClient(ctrl)
-
-	mockResp := &http.Response{
-		StatusCode: 200,
-		Body:       io.NopCloser(strings.NewReader(connectorYAML)),
-	}
-
 	httpClient = mockClient
 
-	return mockClient, mockResp
+	return mockClient
+}
+
+//nolint:bodyclose // Body is closed in the validator, bodyclose is not recognizing this.
+func getHTTPResps() []func(*http.Request) (*http.Response, error) {
+	var resps []func(*http.Request) (*http.Response, error)
+
+	respFn := func(_ *http.Request) (*http.Response, error) {
+		resp := &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString("{\"tag_name\": \"v0.10.1\"}")),
+		}
+		return resp, nil
+	}
+	resps = append(resps, respFn)
+
+	respFn = func(_ *http.Request) (*http.Response, error) {
+		resp := &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(strings.NewReader(connectorYAML)),
+		}
+		return resp, nil
+	}
+	resps = append(resps, respFn)
+
+	return resps
 }

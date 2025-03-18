@@ -4,9 +4,12 @@ package v1alpha
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/conduitio/conduit-commons/config"
 	sdk "github.com/conduitio/conduit-connector-sdk"
@@ -15,7 +18,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-const baseURL = "https://conduit.io/connectors/github.com/ConduitIO"
+const (
+	baseURL        = "https://conduit.io/connectors/github.com"
+	conduitOrg     = "conduitio"
+	conduitLabsOrg = "conduitio-labs"
+)
 
 var httpClient HTTPClient = http.DefaultClient
 
@@ -90,9 +97,13 @@ func getPluginParameters(c *v1alpha.ConduitConnector) (func() sdk.Specification,
 }
 
 func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
-	connectorURL := fmt.Sprintf("%s/%s%%40%s/connector.yaml", baseURL, c.PluginName, c.PluginVersion)
-
 	ctx := context.Background()
+
+	cn, org := getConnectorInfo(c.PluginName)
+	ver := getPluginVersion(ctx, c.PluginVersion, cn, org)
+	connectorURL := fmt.Sprintf("%s/%s/%s@%s/connector.yaml", baseURL, org, cn, ver)
+	fmt.Println(connectorURL)
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, connectorURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("creating the http request %w", err)
@@ -101,6 +112,7 @@ func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("getting yaml from cache with error %w", err)
+		// do we want to fail gracefully if cant get yaml or doesnt exist
 	}
 	defer resp.Body.Close()
 
@@ -113,4 +125,52 @@ func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
 		return "", fmt.Errorf("reading response body %w", err)
 	}
 	return string(body), nil
+}
+
+// converts the connector string into the format "conduit-connector-connectorName"
+func getConnectorInfo(pn string) (string, string) {
+	// if builtin connector in conduitio
+	trimmedName := strings.TrimPrefix(pn, "builtin:")
+	if slices.Contains(
+		conduit.BuiltinConnectors,
+		trimmedName,
+	) {
+		return fmt.Sprintf("conduit-connector-%s", trimmedName), conduitOrg
+	}
+
+	// TODO if in conduitio-labs
+
+	return "", ""
+}
+
+func getPluginVersion(ctx context.Context, ver string, n string, org string) string {
+	if ver == "latest" {
+		pluginURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", org, n)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pluginURL, nil)
+		if err != nil { // or status code
+			// TODO cant get latest release, but this version will cause the url to break
+			return ""
+		}
+		resp, err := httpClient.Do(req)
+		if err != nil { // or status code
+			// TODO cant get latest release, but this version will cause the url to break
+			return ""
+		}
+		defer resp.Body.Close()
+		// get the most recent version of the plugin, return that number
+
+		type Release struct {
+			TagName string `json:"tag_name"`
+		}
+		var rel Release
+		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+			// TODO handle decoding error
+			return ""
+		}
+
+		return rel.TagName
+	}
+
+	return ver
 }
