@@ -62,8 +62,8 @@ func validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *f
 	}
 	spec, err := getPluginParameters(c)
 	if err != nil {
-		// TODO log an error, but dont return an error
-		return field.InternalError(fp.Child("parameter"), fmt.Errorf("failed getting plugin params from cache with error %w", err))
+		// TODO log an error
+		return nil
 	}
 
 	settings := make(map[string]string)

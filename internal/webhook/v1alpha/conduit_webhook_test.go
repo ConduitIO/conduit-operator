@@ -48,6 +48,7 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	}
 }
 
+//nolint:bodyclose
 func TestWebhook_ValidateCreate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -58,7 +59,6 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
 				webClient := setupHTTPMockClient(t)
-				//nolint:bodyclose
 				httpResps := getHTTPResps()
 				gomock.InOrder(
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
@@ -71,17 +71,35 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			},
 		},
 		{
-			name: "error occurs",
+			name: "error occurs on http call",
 			setup: func() *v1alpha.Conduit {
 				webClient := setupHTTPMockClient(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
 				return setupSampleConduit(t, true)
 			},
+			wantErr: nil,
+		},
+		{
+			name: "error occurs during validation",
+			setup: func() *v1alpha.Conduit {
+				webClient := setupHTTPMockClient(t)
+				httpResps := getHTTPResps()
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+				)
+
+				return setupBadSampleConduit(t)
+			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
-				field.InternalError(
+				field.Invalid(
 					field.NewPath("spec", "connectors", "parameter"),
-					fmt.Errorf("failed getting plugin params from cache with error getting plugin version with error BOOM")),
+					"source",
+					"error validating \"topics\": required parameter is not provided",
+				),
 			}),
 		},
 	}
@@ -127,17 +145,35 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "error occurs",
+			name: "error occurs on http call",
 			setup: func() *v1alpha.Conduit {
 				webClient := setupHTTPMockClient(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
 				return setupSampleConduit(t, true)
 			},
+			wantErr: nil,
+		},
+		{
+			name: "error occurs during validation",
+			setup: func() *v1alpha.Conduit {
+				webClient := setupHTTPMockClient(t)
+				httpResps := getHTTPResps()
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+				)
+
+				return setupBadSampleConduit(t)
+			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
-				field.InternalError(
+				field.Invalid(
 					field.NewPath("spec", "connectors", "parameter"),
-					fmt.Errorf("failed getting plugin params from cache with error getting plugin version with error BOOM")),
+					"source",
+					"error validating \"topics\": required parameter is not provided",
+				),
 			}),
 		},
 	}

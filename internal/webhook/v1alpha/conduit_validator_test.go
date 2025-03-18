@@ -310,6 +310,82 @@ func setupSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	return c
 }
 
+func setupBadSampleConduit(t *testing.T) *v1alpha.Conduit {
+	t.Helper()
+
+	is := is.New(t)
+	defaulter := ConduitCustomDefaulter{}
+	running := true
+
+	c := &v1alpha.Conduit{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sample",
+			Namespace: "sample",
+		},
+		Spec: v1alpha.ConduitSpec{
+			Running:     &running,
+			Name:        "my-pipeline",
+			Description: "my-description",
+			Connectors: []*v1alpha.ConduitConnector{
+				{
+					Name:   "source-connector",
+					Type:   "source",
+					Plugin: "builtin:kafka",
+					Settings: []v1alpha.SettingsVar{
+						{
+							Name:  "servers",
+							Value: "127.0.0.1",
+						},
+					},
+				},
+				{
+					Name:   "destination-connector",
+					Type:   "destination",
+					Plugin: "builtin:kafka",
+					Settings: []v1alpha.SettingsVar{
+						{
+							Name:  "servers",
+							Value: "127.0.0.1",
+						},
+						{
+							Name:  "topic",
+							Value: "output-topic",
+						},
+					},
+				},
+			},
+			Processors: []*v1alpha.ConduitProcessor{
+				{
+					Name:      "proc1",
+					Plugin:    "builtin:base64.encode",
+					Workers:   2,
+					Condition: "{{ eq .Metadata.key \"pipeline\" }}",
+					Settings: []v1alpha.SettingsVar{
+						{
+							Name: "setting01",
+							SecretRef: &corev1.SecretKeySelector{
+								Key: "setting01-%p-key",
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "setting01-secret-name",
+								},
+							},
+						},
+						{
+							Name:  "setting02",
+							Value: "setting02-val",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// apply defaults
+	is.NoErr(defaulter.Default(context.Background(), c))
+
+	return c
+}
+
 func setupHTTPMockClient(t *testing.T) *mock.MockHTTPClient {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
