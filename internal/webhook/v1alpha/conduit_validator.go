@@ -62,6 +62,7 @@ func validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *f
 	}
 	spec, err := getPluginParameters(c)
 	if err != nil {
+		// TODO log an error, but dont return an error
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("failed getting plugin params from cache with error %w", err))
 	}
 
@@ -96,13 +97,17 @@ func getPluginParameters(c *v1alpha.ConduitConnector) (func() sdk.Specification,
 	return sdk.YAMLSpecification(body, c.PluginVersion), nil
 }
 
+// getCachedYaml makes a call to conduit.io to get the connector.yaml
+// for the appropriate plugin
 func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
 	ctx := context.Background()
 
 	cn, org := getConnectorInfo(c.PluginName)
-	ver := getPluginVersion(ctx, c.PluginVersion, cn, org)
+	ver, err := getPluginVersion(ctx, c.PluginVersion, cn, org)
+	if err != nil {
+		return "", fmt.Errorf("getting plugin version with error %w", err)
+	}
 	connectorURL := fmt.Sprintf("%s/%s/%s@%s/connector.yaml", baseURL, org, cn, ver)
-	fmt.Println(connectorURL)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, connectorURL, nil)
 	if err != nil {
@@ -112,7 +117,6 @@ func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("getting yaml from cache with error %w", err)
-		// do we want to fail gracefully if cant get yaml or doesnt exist
 	}
 	defer resp.Body.Close()
 
@@ -127,7 +131,8 @@ func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
 	return string(body), nil
 }
 
-// converts the connector string into the format "conduit-connector-connectorName"
+// getConnectorInfo converts the connector string into the format
+// "conduit-connector-connectorName"
 func getConnectorInfo(pn string) (string, string) {
 	// if builtin connector in conduitio
 	trimmedName := strings.TrimPrefix(pn, "builtin:")
@@ -143,34 +148,35 @@ func getConnectorInfo(pn string) (string, string) {
 	return "", ""
 }
 
-func getPluginVersion(ctx context.Context, ver string, n string, org string) string {
+// getPluginVersion will either return the ver in the parameter or parse a version "latest"
+// into the latest version number
+func getPluginVersion(ctx context.Context, ver string, n string, org string) (string, error) {
 	if ver == "latest" {
 		pluginURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", org, n)
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pluginURL, nil)
-		if err != nil { // or status code
-			// TODO cant get latest release, but this version will cause the url to break
-			return ""
+		if err != nil {
+			return "", err
 		}
+
 		resp, err := httpClient.Do(req)
-		if err != nil { // or status code
-			// TODO cant get latest release, but this version will cause the url to break
-			return ""
+		if err != nil || resp.StatusCode != http.StatusOK {
+			return "", err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("getting latest release with status code: %d", resp.StatusCode)
 		}
 		defer resp.Body.Close()
-		// get the most recent version of the plugin, return that number
 
-		type Release struct {
+		var rel struct {
 			TagName string `json:"tag_name"`
 		}
-		var rel Release
 		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-			// TODO handle decoding error
-			return ""
+			return "", err
 		}
 
-		return rel.TagName
+		return rel.TagName, nil
 	}
 
-	return ver
+	return ver, nil
 }

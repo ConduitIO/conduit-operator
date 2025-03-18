@@ -81,7 +81,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.InternalError(
 					field.NewPath("spec", "connectors", "parameter"),
-					fmt.Errorf("failed getting plugin params from cache with error getting yaml from cache with error BOOM")),
+					fmt.Errorf("failed getting plugin params from cache with error getting plugin version with error BOOM")),
 			}),
 		},
 	}
@@ -137,7 +137,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.InternalError(
 					field.NewPath("spec", "connectors", "parameter"),
-					fmt.Errorf("failed getting plugin params from cache with error getting yaml from cache with error BOOM")),
+					fmt.Errorf("failed getting plugin params from cache with error getting plugin version with error BOOM")),
 			}),
 		},
 	}
