@@ -381,11 +381,11 @@ func setupBadNameConduit(t *testing.T) *v1alpha.Conduit {
 	return c
 }
 
-func setupHTTPMockClient(t *testing.T) *mock.MockHTTPClient {
+func setupHTTPMockClient(t *testing.T) *mock.MockhttpClient {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockClient := mock.NewMockHTTPClient(ctrl)
+	mockClient := mock.NewMockhttpClient(ctrl)
 	HTTPClient = mockClient
 
 	return mockClient

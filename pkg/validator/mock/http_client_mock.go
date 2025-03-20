@@ -11,31 +11,31 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockHTTPClient is a mock of HTTPClient interface.
-type MockHTTPClient struct {
+// MockhttpClient is a mock of httpClient interface.
+type MockhttpClient struct {
 	ctrl     *gomock.Controller
-	recorder *MockHTTPClientMockRecorder
+	recorder *MockhttpClientMockRecorder
 }
 
-// MockHTTPClientMockRecorder is the mock recorder for MockHTTPClient.
-type MockHTTPClientMockRecorder struct {
-	mock *MockHTTPClient
+// MockhttpClientMockRecorder is the mock recorder for MockhttpClient.
+type MockhttpClientMockRecorder struct {
+	mock *MockhttpClient
 }
 
-// NewMockHTTPClient creates a new mock instance.
-func NewMockHTTPClient(ctrl *gomock.Controller) *MockHTTPClient {
-	mock := &MockHTTPClient{ctrl: ctrl}
-	mock.recorder = &MockHTTPClientMockRecorder{mock}
+// NewMockhttpClient creates a new mock instance.
+func NewMockhttpClient(ctrl *gomock.Controller) *MockhttpClient {
+	mock := &MockhttpClient{ctrl: ctrl}
+	mock.recorder = &MockhttpClientMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockHTTPClient) EXPECT() *MockHTTPClientMockRecorder {
+func (m *MockhttpClient) EXPECT() *MockhttpClientMockRecorder {
 	return m.recorder
 }
 
 // Do mocks base method.
-func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+func (m *MockhttpClient) Do(req *http.Request) (*http.Response, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Do", req)
 	ret0, _ := ret[0].(*http.Response)
@@ -44,7 +44,7 @@ func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 }
 
 // Do indicates an expected call of Do.
-func (mr *MockHTTPClientMockRecorder) Do(req interface{}) *gomock.Call {
+func (mr *MockhttpClientMockRecorder) Do(req interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Do", reflect.TypeOf((*MockHTTPClient)(nil).Do), req)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Do", reflect.TypeOf((*MockhttpClient)(nil).Do), req)
 }
