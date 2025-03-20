@@ -35,6 +35,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	internalconduit "github.com/conduitio/conduit-operator/internal/conduit"
+	"github.com/conduitio/conduit-operator/pkg/validator"
 )
 
 var conduitVerConstraint *semver.Constraints
@@ -218,11 +219,11 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		if paramErr := validateConnectorParameters(c, fp); paramErr != nil {
+		if paramErr := validator.ValidateConnectorParameters(c, fp); paramErr != nil {
 			errs = append(errs, paramErr)
 		}
 
-		for _, fn := range connectorValidators {
+		for _, fn := range validator.ConnectorValidators {
 			if err := fn(c, fp); err != nil {
 				errs = append(errs, err)
 			}
@@ -244,7 +245,7 @@ func (*ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcessor
 	var errs field.ErrorList
 
 	for _, p := range pp {
-		if err := validateProcessorPlugin(p, fp); err != nil {
+		if err := validator.ValidateProcessorPlugin(p, fp); err != nil {
 			errs = append(errs, err)
 		}
 	}

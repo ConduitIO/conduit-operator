@@ -1,6 +1,6 @@
 //go:generate mockgen --build_flags=--mod=mod -source=./conduit_validator.go -destination=mock/http_client_mock.go -package=mock
 
-package v1alpha
+package validator
 
 import (
 	"context"
@@ -24,39 +24,39 @@ const (
 	conduitOrg = "conduitio"
 )
 
-var httpClient HTTPClient = http.DefaultClient
+var HTTPClient IHTTPClient = http.DefaultClient
 
-type HTTPClient interface {
+type IHTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-var connectorValidators = []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
-	validateConnectorPlugin,
-	validateConnectorPluginType,
+var ConnectorValidators = []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
+	ValidateConnectorPlugin,
+	ValidateConnectorPluginType,
 }
 
-func validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func ValidateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := conduit.ValidatePlugin(c.Plugin); err != nil {
 		return field.Invalid(fp.Child("plugin"), c.Plugin, err.Error())
 	}
 	return nil
 }
 
-func validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func ValidateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := conduit.ValidatePluginType(c.Type); err != nil {
 		return field.Invalid(fp.Child("type"), c.Type, err.Error())
 	}
 	return nil
 }
 
-func validateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+func ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
 	if p.Plugin == "" {
 		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
 	return nil
 }
 
-func validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func ValidateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if !(c.Type == "source" || c.Type == "destination") {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
@@ -114,7 +114,7 @@ func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
 		return "", fmt.Errorf("creating the http request %w", err)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("getting yaml from cache with error %w", err)
 	}
@@ -171,7 +171,7 @@ func getPluginVersion(ctx context.Context, ver string, n string, org string) (st
 			return "", err
 		}
 
-		resp, err := httpClient.Do(req)
+		resp, err := HTTPClient.Do(req)
 		if err != nil {
 			return "", err
 		}
