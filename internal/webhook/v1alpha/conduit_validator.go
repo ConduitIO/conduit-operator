@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -19,9 +20,8 @@ import (
 )
 
 const (
-	baseURL        = "https://conduit.io/connectors/github.com"
-	conduitOrg     = "conduitio"
-	conduitLabsOrg = "conduitio-labs"
+	baseURL    = "https://conduit.io/connectors/github.com"
+	conduitOrg = "conduitio"
 )
 
 var httpClient HTTPClient = http.DefaultClient
@@ -132,10 +132,24 @@ func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
 }
 
 // getConnectorInfo converts the connector string into the format
-// "conduit-connector-connectorName"
+// "conduit-connector-connectorName" to match the name in github
+// Returns the github organization and the transformed connector name
 func getConnectorInfo(pn string) (string, string) {
-	// if builtin connector in conduitio
-	trimmedName := strings.TrimPrefix(pn, "builtin:")
+	trimmedName := strings.ToLower(pn)
+	trimmedName = strings.TrimPrefix(trimmedName, "github.com/")
+
+	prefixPattern := "[A-Za-z0-9_.-]/[A-Za-z0-9_.-]"
+	hasPrefix, err := regexp.MatchString(prefixPattern, trimmedName)
+	if err != nil {
+		return "", ""
+	}
+	if hasPrefix {
+		info := strings.Split(trimmedName, "/")
+		return info[0], info[1]
+	}
+
+	// handle transforming "builtin:connector" to desired format
+	trimmedName = strings.TrimPrefix(trimmedName, "builtin:")
 	if slices.Contains(
 		conduit.BuiltinConnectors,
 		trimmedName,
@@ -143,9 +157,7 @@ func getConnectorInfo(pn string) (string, string) {
 		return fmt.Sprintf("conduit-connector-%s", trimmedName), conduitOrg
 	}
 
-	// TODO if in conduitio-labs
-
-	return "", ""
+	return "", pn
 }
 
 // getPluginVersion will either return the ver in the parameter or parse a version "latest"
@@ -160,7 +172,7 @@ func getPluginVersion(ctx context.Context, ver string, n string, org string) (st
 		}
 
 		resp, err := httpClient.Do(req)
-		if err != nil || resp.StatusCode != http.StatusOK {
+		if err != nil {
 			return "", err
 		}
 		if resp.StatusCode != http.StatusOK {

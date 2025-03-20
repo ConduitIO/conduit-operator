@@ -92,7 +92,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
 				)
 
-				return setupBadSampleConduit(t)
+				return setupBadValidationConduit(t)
 			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.Invalid(
@@ -122,6 +122,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 	}
 }
 
+//nolint:bodyclose
 func TestWebhook_ValidateUpdate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -132,7 +133,6 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
 				webClient := setupHTTPMockClient(t)
-				//nolint:bodyclose
 				httpFnResps := getHTTPResps()
 				gomock.InOrder(
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[0]),
@@ -166,7 +166,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
 				)
 
-				return setupBadSampleConduit(t)
+				return setupBadValidationConduit(t)
 			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.Invalid(

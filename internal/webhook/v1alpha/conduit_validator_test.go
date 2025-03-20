@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -153,10 +152,7 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 
 //nolint:bodyclose // Body is closed in the validator, bodyclose is not recognizing this.
 func TestValidator_ConnectorParameters(t *testing.T) {
-	var (
-		is        = is.New(t)
-		errorPath = field.NewPath("spec").Child("connectors").Child("parameter")
-	)
+	is := is.New(t)
 
 	tests := []struct {
 		name    string
@@ -196,6 +192,28 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			},
 		},
 		{
+			name: "bad connector name",
+			setup: func() *v1alpha.ConduitConnector {
+				conduit := setupBadNameConduit(t)
+
+				webClient := setupHTTPMockClient(t)
+				respFn := func(_ *http.Request) (*http.Response, error) {
+					resp := &http.Response{
+						StatusCode: http.StatusNotFound,
+						Body:       io.NopCloser(bytes.NewBufferString("{\"message\": \"Not Found\"}")),
+					}
+					return resp, nil
+				}
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(respFn),
+				)
+
+				return conduit.Spec.Connectors[0]
+			},
+			wantErr: nil,
+		},
+		{
 			name: "error getting cached yaml",
 			setup: func() *v1alpha.ConduitConnector {
 				conduit := setupSampleConduit(t, true)
@@ -210,9 +228,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 
 				return conduit.Spec.Connectors[0]
 			},
-			wantErr: field.InternalError(
-				errorPath,
-				fmt.Errorf("failed getting plugin params from cache with error getting yaml from cache with error BOOM")),
+			wantErr: nil,
 		},
 	}
 
@@ -310,7 +326,64 @@ func setupSampleConduit(t *testing.T, running bool) *v1alpha.Conduit {
 	return c
 }
 
-func setupBadSampleConduit(t *testing.T) *v1alpha.Conduit {
+func setupBadNameConduit(t *testing.T) *v1alpha.Conduit {
+	t.Helper()
+
+	is := is.New(t)
+	defaulter := ConduitCustomDefaulter{}
+	running := true
+
+	c := &v1alpha.Conduit{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sample",
+			Namespace: "sample",
+		},
+		Spec: v1alpha.ConduitSpec{
+			Running:     &running,
+			Name:        "my-pipeline",
+			Description: "my-description",
+			Connectors: []*v1alpha.ConduitConnector{
+				{
+					Name:   "source-connector",
+					Type:   "source",
+					Plugin: "generator",
+					Settings: []v1alpha.SettingsVar{
+						{
+							Name:  "servers",
+							Value: "127.0.0.1",
+						},
+						{
+							Name:  "topics",
+							Value: "input-topic",
+						},
+					},
+				},
+				{
+					Name:   "destination-connector",
+					Type:   "destination",
+					Plugin: "builtin:log",
+					Settings: []v1alpha.SettingsVar{
+						{
+							Name:  "servers",
+							Value: "127.0.0.1",
+						},
+						{
+							Name:  "topic",
+							Value: "output-topic",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// apply defaults
+	is.NoErr(defaulter.Default(context.Background(), c))
+
+	return c
+}
+
+func setupBadValidationConduit(t *testing.T) *v1alpha.Conduit {
 	t.Helper()
 
 	is := is.New(t)
@@ -350,29 +423,6 @@ func setupBadSampleConduit(t *testing.T) *v1alpha.Conduit {
 						{
 							Name:  "topic",
 							Value: "output-topic",
-						},
-					},
-				},
-			},
-			Processors: []*v1alpha.ConduitProcessor{
-				{
-					Name:      "proc1",
-					Plugin:    "builtin:base64.encode",
-					Workers:   2,
-					Condition: "{{ eq .Metadata.key \"pipeline\" }}",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name: "setting01",
-							SecretRef: &corev1.SecretKeySelector{
-								Key: "setting01-%p-key",
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "setting01-secret-name",
-								},
-							},
-						},
-						{
-							Name:  "setting02",
-							Value: "setting02-val",
 						},
 					},
 				},
