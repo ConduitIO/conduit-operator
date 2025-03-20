@@ -53,7 +53,7 @@ func init() {
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
 func SetupConduitWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{}).
+		WithValidator(&ConduitCustomValidator{validator.NewConduitValidator()}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
@@ -150,9 +150,15 @@ func (*ConduitCustomDefaulter) proccessorDefaulter(pp []*v1alpha.ConduitProcesso
 
 // ConduitCustomValidator struct is responsible for validating the Conduit resource
 // when it is created, updated, or deleted.
-type ConduitCustomValidator struct{}
+type ConduitCustomValidator struct {
+	validationService validator.Validator
+}
 
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
+
+func NewConduitCustomValidator(validator validator.Validator) *ConduitCustomValidator {
+	return &ConduitCustomValidator{validationService: validator}
+}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
 func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
@@ -219,14 +225,8 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		if paramErr := validator.ValidateConnectorParameters(c, fp); paramErr != nil {
-			errs = append(errs, paramErr)
-		}
-
-		for _, fn := range validator.ConnectorValidators {
-			if err := fn(c, fp); err != nil {
-				errs = append(errs, err)
-			}
+		if err := v.validationService.ValidateConnector(c, fp); err != nil {
+			errs = append(errs, err)
 		}
 
 		if procErrs := v.validateProcessors(c.Processors, fp); procErrs != nil {
@@ -241,11 +241,11 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 	return nil
 }
 
-func (*ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcessor, fp *field.Path) field.ErrorList {
+func (v *ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcessor, fp *field.Path) field.ErrorList {
 	var errs field.ErrorList
 
 	for _, p := range pp {
-		if err := validator.ValidateProcessorPlugin(p, fp); err != nil {
+		if err := v.validationService.ValidateProcessorPlugin(p, fp); err != nil {
 			errs = append(errs, err)
 		}
 	}

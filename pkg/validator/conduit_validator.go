@@ -24,39 +24,57 @@ const (
 	conduitOrg = "conduitio"
 )
 
-var HTTPClient IHTTPClient = http.DefaultClient
+var HTTPClient httpClient = http.DefaultClient
 
-type IHTTPClient interface {
+type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-var ConnectorValidators = []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
-	ValidateConnectorPlugin,
-	ValidateConnectorPluginType,
+var _ Validator = (*ConduitValidator)(nil)
+
+type ConduitValidator struct{}
+
+func NewConduitValidator() *ConduitValidator {
+	return &ConduitValidator{}
 }
 
-func ValidateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *ConduitValidator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+	validations := []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
+		v.validateConnectorPlugin,
+		v.validateConnectorPluginType,
+		v.validateConnectorParameters,
+	}
+
+	for _, v := range validations {
+		if err := v(c, fp); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *ConduitValidator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := conduit.ValidatePlugin(c.Plugin); err != nil {
 		return field.Invalid(fp.Child("plugin"), c.Plugin, err.Error())
 	}
 	return nil
 }
 
-func ValidateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *ConduitValidator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := conduit.ValidatePluginType(c.Type); err != nil {
 		return field.Invalid(fp.Child("type"), c.Type, err.Error())
 	}
 	return nil
 }
 
-func ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+func (v *ConduitValidator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
 	if p.Plugin == "" {
 		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
 	return nil
 }
 
-func ValidateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *ConduitValidator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if !(c.Type == "source" || c.Type == "destination") {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
