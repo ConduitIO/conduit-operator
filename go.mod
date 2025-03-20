@@ -5,6 +5,8 @@ go 1.23.6
 require (
 	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/conduitio/conduit v0.13.2
+	github.com/conduitio/conduit-commons v0.5.1
+	github.com/conduitio/conduit-connector-sdk v0.13.2
 	github.com/conduitio/yaml/v3 v3.3.0
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/mock v1.6.0
@@ -101,7 +103,6 @@ require (
 	github.com/charithe/durationcheck v0.0.10 // indirect
 	github.com/chavacava/garif v0.1.0 // indirect
 	github.com/ckaznocha/intrange v0.3.0 // indirect
-	github.com/conduitio/conduit-commons v0.5.1 // indirect
 	github.com/conduitio/conduit-connector-file v0.10.0 // indirect
 	github.com/conduitio/conduit-connector-generator v0.10.0 // indirect
 	github.com/conduitio/conduit-connector-kafka v0.12.0 // indirect
@@ -109,7 +110,6 @@ require (
 	github.com/conduitio/conduit-connector-postgres v0.11.0 // indirect
 	github.com/conduitio/conduit-connector-protocol v0.9.1 // indirect
 	github.com/conduitio/conduit-connector-s3 v0.9.0 // indirect
-	github.com/conduitio/conduit-connector-sdk v0.13.2 // indirect
 	github.com/conduitio/conduit-processor-sdk v0.4.1 // indirect
 	github.com/conduitio/conduit-schema-registry v0.2.3 // indirect
 	github.com/conduitio/evolviconf v0.1.0 // indirect
