@@ -10,11 +10,10 @@ import (
 	"testing"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit-operator/internal/testutil"
 	"github.com/conduitio/conduit-operator/pkg/validator/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -30,13 +29,13 @@ func TestValidator_ConnectorPlugin(t *testing.T) {
 		{
 			name: "connector plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return setupSampleConduit(t)
+				return testutil.SetupSampleConduit(t)
 			},
 		},
 		{
 			name: "connector plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := setupSampleConduit(t)
+				c := testutil.SetupSampleConduit(t)
 				c.Spec.Connectors[0].Plugin = ""
 				return c
 			},
@@ -74,13 +73,13 @@ func TestValidator_ConnectorPluginType(t *testing.T) {
 		{
 			name: "connector plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return setupSampleConduit(t)
+				return testutil.SetupSampleConduit(t)
 			},
 		},
 		{
 			name: "connector plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := setupSampleConduit(t)
+				c := testutil.SetupSampleConduit(t)
 				c.Spec.Connectors[0].Type = ""
 				return c
 			},
@@ -118,13 +117,13 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 		{
 			name: "processor plugin is valid",
 			setup: func() *v1alpha.Conduit {
-				return setupSampleConduit(t)
+				return testutil.SetupSampleConduit(t)
 			},
 		},
 		{
 			name: "processor plugin is invalid",
 			setup: func() *v1alpha.Conduit {
-				c := setupSampleConduit(t)
+				c := testutil.SetupSampleConduit(t)
 				c.Spec.Processors[0].Plugin = ""
 				return c
 			},
@@ -164,7 +163,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "source connector parameters are valid",
 			setup: func() *v1alpha.ConduitConnector {
-				conduit := setupSampleConduit(t)
+				conduit := testutil.SetupSampleConduit(t)
 
 				webClient := setupHTTPMockClient(t)
 				httpResps := getHTTPResps()
@@ -180,7 +179,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "destination connector parameters are valid",
 			setup: func() *v1alpha.ConduitConnector {
-				conduit := setupSampleConduit(t)
+				conduit := testutil.SetupSampleConduit(t)
 
 				webClient := setupHTTPMockClient(t)
 				httpResps := getHTTPResps()
@@ -196,7 +195,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "bad connector name",
 			setup: func() *v1alpha.ConduitConnector {
-				conduit := setupBadNameConduit(t)
+				conduit := testutil.SetupBadNameConduit(t)
 
 				webClient := setupHTTPMockClient(t)
 				respFn := func(_ *http.Request) (*http.Response, error) {
@@ -218,7 +217,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		{
 			name: "error getting cached yaml",
 			setup: func() *v1alpha.ConduitConnector {
-				conduit := setupSampleConduit(t)
+				conduit := testutil.SetupSampleConduit(t)
 
 				webClient := setupHTTPMockClient(t)
 				httpResps := getHTTPResps()
@@ -248,137 +247,6 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			}
 		})
 	}
-}
-
-func setupSampleConduit(t *testing.T) *v1alpha.Conduit {
-	t.Helper()
-	running := true
-
-	c := &v1alpha.Conduit{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sample",
-			Namespace: "sample",
-		},
-		Spec: v1alpha.ConduitSpec{
-			Running:     &running,
-			Name:        "my-pipeline",
-			Description: "my-description",
-			Connectors: []*v1alpha.ConduitConnector{
-				{
-					Name:          "source-connector",
-					Type:          "source",
-					Plugin:        "builtin:generator",
-					PluginVersion: "latest",
-					PluginName:    "builtin:generator",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-						{
-							Name:  "topics",
-							Value: "input-topic",
-						},
-					},
-				},
-				{
-					Name:          "destination-connector",
-					Type:          "destination",
-					Plugin:        "builtin:log",
-					PluginVersion: "latest",
-					PluginName:    "builtin:log",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-						{
-							Name:  "topic",
-							Value: "output-topic",
-						},
-					},
-				},
-			},
-			Processors: []*v1alpha.ConduitProcessor{
-				{
-					ID:        "proc1",
-					Name:      "proc1",
-					Plugin:    "builtin:base64.encode",
-					Workers:   2,
-					Condition: "{{ eq .Metadata.key \"pipeline\" }}",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name: "setting01",
-							SecretRef: &corev1.SecretKeySelector{
-								Key: "setting01-%p-key",
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "setting01-secret-name",
-								},
-							},
-						},
-						{
-							Name:  "setting02",
-							Value: "setting02-val",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return c
-}
-
-func setupBadNameConduit(t *testing.T) *v1alpha.Conduit {
-	t.Helper()
-
-	running := true
-
-	c := &v1alpha.Conduit{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sample",
-			Namespace: "sample",
-		},
-		Spec: v1alpha.ConduitSpec{
-			Running:     &running,
-			Name:        "my-pipeline",
-			Description: "my-description",
-			Connectors: []*v1alpha.ConduitConnector{
-				{
-					Name:   "source-connector",
-					Type:   "source",
-					Plugin: "generator",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-						{
-							Name:  "topics",
-							Value: "input-topic",
-						},
-					},
-				},
-				{
-					Name:   "destination-connector",
-					Type:   "destination",
-					Plugin: "builtin:log",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-						{
-							Name:  "topic",
-							Value: "output-topic",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return c
 }
 
 func setupHTTPMockClient(t *testing.T) *mock.MockhttpClient {

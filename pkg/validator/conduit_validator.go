@@ -53,6 +53,13 @@ func (v *ConduitValidator) ValidateConnector(c *v1alpha.ConduitConnector, fp *fi
 	return nil
 }
 
+func (v *ConduitValidator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+	if p.Plugin == "" {
+		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
+	}
+	return nil
+}
+
 func (v *ConduitValidator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := conduit.ValidatePlugin(c.Plugin); err != nil {
 		return field.Invalid(fp.Child("plugin"), c.Plugin, err.Error())
@@ -63,13 +70,6 @@ func (v *ConduitValidator) validateConnectorPlugin(c *v1alpha.ConduitConnector, 
 func (v *ConduitValidator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := conduit.ValidatePluginType(c.Type); err != nil {
 		return field.Invalid(fp.Child("type"), c.Type, err.Error())
-	}
-	return nil
-}
-
-func (v *ConduitValidator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
-	if p.Plugin == "" {
-		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
 	return nil
 }
@@ -205,6 +205,7 @@ func getPluginVersion(ctx context.Context, ver string, n string, org string) (st
 			return "", err
 		}
 
+		// TODO log which version returned
 		return rel.TagName, nil
 	}
 

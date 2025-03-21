@@ -12,13 +12,12 @@ import (
 	"testing"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit-operator/internal/testutil"
 	"github.com/conduitio/conduit-operator/pkg/validator"
 	"github.com/conduitio/conduit-operator/pkg/validator/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -79,7 +78,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
 				)
 
-				return setupSampleConduit(t)
+				return testutil.SetupSampleConduit(t)
 			},
 		},
 		{
@@ -88,7 +87,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 				webClient := setupHTTPMockClient(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
-				return setupSampleConduit(t)
+				return testutil.SetupSampleConduit(t)
 			},
 			wantErr: nil,
 		},
@@ -100,11 +99,10 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 				gomock.InOrder(
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
 				)
 
-				return setupBadValidationConduit(t)
+				return testutil.SetupBadValidationConduit(t)
 			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.Invalid(
@@ -153,7 +151,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[1]),
 				)
 
-				return setupSampleConduit(t)
+				return testutil.SetupSampleConduit(t)
 			},
 		},
 		{
@@ -162,7 +160,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 				webClient := setupHTTPMockClient(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
-				return setupSampleConduit(t)
+				return testutil.SetupSampleConduit(t)
 			},
 			wantErr: nil,
 		},
@@ -174,11 +172,10 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 				gomock.InOrder(
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
 				)
 
-				return setupBadValidationConduit(t)
+				return testutil.SetupBadValidationConduit(t)
 			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.Invalid(
@@ -206,139 +203,6 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func setupSampleConduit(t *testing.T) *v1alpha.Conduit {
-	t.Helper()
-
-	is := is.New(t)
-	defaulter := ConduitCustomDefaulter{}
-	running := true
-
-	c := &v1alpha.Conduit{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sample",
-			Namespace: "sample",
-		},
-		Spec: v1alpha.ConduitSpec{
-			Running:     &running,
-			Name:        "my-pipeline",
-			Description: "my-description",
-			Connectors: []*v1alpha.ConduitConnector{
-				{
-					Name:   "source-connector",
-					Type:   "source",
-					Plugin: "builtin:generator",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-						{
-							Name:  "topics",
-							Value: "input-topic",
-						},
-					},
-				},
-				{
-					Name:   "destination-connector",
-					Type:   "destination",
-					Plugin: "builtin:log",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-						{
-							Name:  "topic",
-							Value: "output-topic",
-						},
-					},
-				},
-			},
-			Processors: []*v1alpha.ConduitProcessor{
-				{
-					Name:      "proc1",
-					Plugin:    "builtin:base64.encode",
-					Workers:   2,
-					Condition: "{{ eq .Metadata.key \"pipeline\" }}",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name: "setting01",
-							SecretRef: &corev1.SecretKeySelector{
-								Key: "setting01-%p-key",
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "setting01-secret-name",
-								},
-							},
-						},
-						{
-							Name:  "setting02",
-							Value: "setting02-val",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// apply defaults
-	is.NoErr(defaulter.Default(context.Background(), c))
-
-	return c
-}
-
-func setupBadValidationConduit(t *testing.T) *v1alpha.Conduit {
-	t.Helper()
-
-	is := is.New(t)
-	defaulter := ConduitCustomDefaulter{}
-	running := true
-
-	c := &v1alpha.Conduit{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "sample",
-			Namespace: "sample",
-		},
-		Spec: v1alpha.ConduitSpec{
-			Running:     &running,
-			Name:        "my-pipeline",
-			Description: "my-description",
-			Connectors: []*v1alpha.ConduitConnector{
-				{
-					Name:   "source-connector",
-					Type:   "source",
-					Plugin: "builtin:kafka",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-					},
-				},
-				{
-					Name:   "destination-connector",
-					Type:   "destination",
-					Plugin: "builtin:kafka",
-					Settings: []v1alpha.SettingsVar{
-						{
-							Name:  "servers",
-							Value: "127.0.0.1",
-						},
-						{
-							Name:  "topic",
-							Value: "output-topic",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	// apply defaults
-	is.NoErr(defaulter.Default(context.Background(), c))
-
-	return c
 }
 
 func setupHTTPMockClient(t *testing.T) *mock.MockhttpClient {
