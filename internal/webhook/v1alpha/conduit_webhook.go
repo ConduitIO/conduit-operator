@@ -36,9 +36,12 @@ import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	internalconduit "github.com/conduitio/conduit-operator/internal/conduit"
 	"github.com/conduitio/conduit-operator/pkg/validator"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var conduitVerConstraint *semver.Constraints
+
+var webhookLog = log.Log.WithName("webhook")
 
 func init() {
 	var err error
@@ -225,7 +228,7 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		if err := v.validationService.ValidateConnector(c, fp); err != nil {
+		if err := v.validationService.ValidateConnector(c, fp, webhookLog); err != nil {
 			errs = append(errs, err)
 		}
 

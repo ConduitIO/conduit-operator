@@ -12,6 +12,7 @@ import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
 	"github.com/conduitio/conduit-operator/pkg/validator/mock"
+	"github.com/go-logr/logr/testr"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -51,9 +52,10 @@ func TestValidator_ConnectorPlugin(t *testing.T) {
 			is := is.New(t)
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
+			logger := testr.New(t)
 			v := NewConduitValidator()
 
-			err := v.ValidateConnector(c.Spec.Connectors[0], fp)
+			err := v.ValidateConnector(c.Spec.Connectors[0], fp, logger)
 			if tc.wantErr != nil {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
@@ -94,10 +96,11 @@ func TestValidator_ConnectorPluginType(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
 			c := tc.setup()
+			logger := testr.New(t)
 			fp := field.NewPath("spec").Child("connectors")
 			v := NewConduitValidator()
 
-			err := v.ValidateConnector(c.Spec.Connectors[0], fp)
+			err := v.ValidateConnector(c.Spec.Connectors[0], fp, logger)
 			if tc.wantErr != nil {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
@@ -237,9 +240,10 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 		t.Run(tc.name, func(_ *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
+			logger := testr.New(t)
 			v := NewConduitValidator()
 
-			err := v.ValidateConnector(c, fp)
+			err := v.ValidateConnector(c, fp, logger)
 			if tc.wantErr != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {

@@ -16,6 +16,7 @@ import (
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/conduit"
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -38,15 +39,15 @@ func NewConduitValidator() *ConduitValidator {
 	return &ConduitValidator{}
 }
 
-func (v *ConduitValidator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
-	validations := []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
+func (v *ConduitValidator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path, logger logr.Logger) *field.Error {
+	validations := []func(*v1alpha.ConduitConnector, *field.Path, logr.Logger) *field.Error{
 		v.validateConnectorPlugin,
 		v.validateConnectorPluginType,
 		v.validateConnectorParameters,
 	}
 
 	for _, v := range validations {
-		if err := v(c, fp); err != nil {
+		if err := v(c, fp, logger); err != nil {
 			return err
 		}
 	}
@@ -60,27 +61,27 @@ func (v *ConduitValidator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, 
 	return nil
 }
 
-func (v *ConduitValidator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *ConduitValidator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
 	if err := conduit.ValidatePlugin(c.Plugin); err != nil {
 		return field.Invalid(fp.Child("plugin"), c.Plugin, err.Error())
 	}
 	return nil
 }
 
-func (v *ConduitValidator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *ConduitValidator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
 	if err := conduit.ValidatePluginType(c.Type); err != nil {
 		return field.Invalid(fp.Child("type"), c.Type, err.Error())
 	}
 	return nil
 }
 
-func (v *ConduitValidator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *ConduitValidator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path, log logr.Logger) *field.Error {
 	if !(c.Type == "source" || c.Type == "destination") {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
-	spec, err := getPluginParameters(c)
+	spec, err := getPluginParameters(c, log)
 	if err != nil {
-		// TODO log an error
+		log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
 		return nil
 	}
 
@@ -106,8 +107,8 @@ func (v *ConduitValidator) validateConnectorParameters(c *v1alpha.ConduitConnect
 	return nil
 }
 
-func getPluginParameters(c *v1alpha.ConduitConnector) (func() sdk.Specification, error) {
-	body, err := getCachedYaml(c)
+func getPluginParameters(c *v1alpha.ConduitConnector, log logr.Logger) (func() sdk.Specification, error) {
+	body, err := getCachedYaml(c, log)
 	if err != nil {
 		return func() sdk.Specification { return sdk.Specification{} }, err
 	}
@@ -117,11 +118,11 @@ func getPluginParameters(c *v1alpha.ConduitConnector) (func() sdk.Specification,
 
 // getCachedYaml makes a call to conduit.io to get the connector.yaml
 // for the appropriate plugin
-func getCachedYaml(c *v1alpha.ConduitConnector) (string, error) {
+func getCachedYaml(c *v1alpha.ConduitConnector, log logr.Logger) (string, error) {
 	ctx := context.Background()
 
 	cn, org := getConnectorInfo(c.PluginName)
-	ver, err := getPluginVersion(ctx, c.PluginVersion, cn, org)
+	ver, err := getPluginVersion(ctx, c.PluginVersion, cn, org, log)
 	if err != nil {
 		return "", fmt.Errorf("getting plugin version with error %w", err)
 	}
@@ -180,7 +181,7 @@ func getConnectorInfo(pn string) (string, string) {
 
 // getPluginVersion will either return the ver in the parameter or parse a version "latest"
 // into the latest version number
-func getPluginVersion(ctx context.Context, ver string, n string, org string) (string, error) {
+func getPluginVersion(ctx context.Context, ver string, n string, org string, log logr.Logger) (string, error) {
 	if ver == "latest" {
 		pluginURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", org, n)
 
@@ -205,7 +206,7 @@ func getPluginVersion(ctx context.Context, ver string, n string, org string) (st
 			return "", err
 		}
 
-		// TODO log which version returned
+		log.Info("Connector plugin %s set to version 'latest', version %s found", n, rel.TagName)
 		return rel.TagName, nil
 	}
 
