@@ -34,8 +34,7 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	internalconduit "github.com/conduitio/conduit-operator/internal/conduit"
-	"github.com/conduitio/conduit-operator/pkg/validator"
+	validation "github.com/conduitio/conduit-operator/pkg/conduit"
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -55,7 +54,7 @@ func init() {
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
 func SetupConduitWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}).
+		WithValidator(&ConduitCustomValidator{validation.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
@@ -118,7 +117,7 @@ func (d *ConduitCustomDefaulter) Default(_ context.Context, obj runtime.Object) 
 		plugin := strings.ToLower(c.Plugin)
 
 		switch {
-		case slices.Contains(internalconduit.BuiltinConnectors, plugin):
+		case slices.Contains(validation.BuiltinConnectors, plugin):
 			c.Plugin = "builtin:" + plugin
 			c.PluginName = c.Plugin
 		case strings.HasPrefix(plugin, "builtin:"):
@@ -153,13 +152,13 @@ func (*ConduitCustomDefaulter) proccessorDefaulter(pp []*v1alpha.ConduitProcesso
 // ConduitCustomValidator struct is responsible for validating the Conduit resource
 // when it is created, updated, or deleted.
 type ConduitCustomValidator struct {
-	validator.Validator
+	validation.ValidatorService
 	Log logr.Logger
 }
 
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
 
-func NewConduitCustomValidator(validator validator.Validator) *ConduitCustomValidator {
+func NewConduitCustomValidator(validator validation.ValidatorService) *ConduitCustomValidator {
 	return &ConduitCustomValidator{
 		validator,
 		log.Log.WithName("webhook-validation-log"),

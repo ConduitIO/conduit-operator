@@ -1,6 +1,6 @@
 //go:generate mockgen --build_flags=--mod=mod -source=./conduit_validator.go -destination=mock/http_client_mock.go -package=mock
 
-package validator
+package conduit
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"github.com/conduitio/conduit-commons/config"
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	"github.com/conduitio/conduit-operator/internal/conduit"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -31,15 +30,15 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-var _ Validator = (*ConduitValidator)(nil)
+var _ ValidatorService = (*Validator)(nil)
 
-type ConduitValidator struct{}
+type Validator struct{}
 
-func NewConduitValidator() *ConduitValidator {
-	return &ConduitValidator{}
+func NewConduitValidator() *Validator {
+	return &Validator{}
 }
 
-func (v *ConduitValidator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path, logger logr.Logger) *field.Error {
+func (v *Validator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path, logger logr.Logger) *field.Error {
 	validations := []func(*v1alpha.ConduitConnector, *field.Path, logr.Logger) *field.Error{
 		v.validateConnectorPlugin,
 		v.validateConnectorPluginType,
@@ -54,28 +53,28 @@ func (v *ConduitValidator) ValidateConnector(c *v1alpha.ConduitConnector, fp *fi
 	return nil
 }
 
-func (v *ConduitValidator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
 	if p.Plugin == "" {
 		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
 	return nil
 }
 
-func (v *ConduitValidator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
-	if err := conduit.ValidatePlugin(c.Plugin); err != nil {
+func (v *Validator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
+	if err := ValidatePlugin(c.Plugin); err != nil {
 		return field.Invalid(fp.Child("plugin"), c.Plugin, err.Error())
 	}
 	return nil
 }
 
-func (v *ConduitValidator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
-	if err := conduit.ValidatePluginType(c.Type); err != nil {
+func (v *Validator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
+	if err := ValidatePluginType(c.Type); err != nil {
 		return field.Invalid(fp.Child("type"), c.Type, err.Error())
 	}
 	return nil
 }
 
-func (v *ConduitValidator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path, log logr.Logger) *field.Error {
+func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path, log logr.Logger) *field.Error {
 	if !(c.Type == "source" || c.Type == "destination") {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
@@ -170,7 +169,7 @@ func getConnectorInfo(pn string) (string, string) {
 	// handle transforming "builtin:connector" to desired format
 	trimmedName = strings.TrimPrefix(trimmedName, "builtin:")
 	if slices.Contains(
-		conduit.BuiltinConnectors,
+		BuiltinConnectors,
 		trimmedName,
 	) {
 		return fmt.Sprintf("conduit-connector-%s", trimmedName), conduitOrg

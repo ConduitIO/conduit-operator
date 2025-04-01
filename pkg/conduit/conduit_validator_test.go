@@ -1,4 +1,4 @@
-package validator
+package conduit
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
-	"github.com/conduitio/conduit-operator/pkg/validator/mock"
+	"github.com/conduitio/conduit-operator/pkg/conduit/mock"
 	"github.com/go-logr/logr/testr"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"

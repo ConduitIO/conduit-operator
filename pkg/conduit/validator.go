@@ -1,4 +1,4 @@
-package validator
+package conduit
 
 import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
@@ -6,7 +6,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-type Validator interface {
+type ValidatorService interface {
 	ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path, logger logr.Logger) *field.Error
 	ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error
 }

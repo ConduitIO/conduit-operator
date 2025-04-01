@@ -13,8 +13,8 @@ import (
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
-	"github.com/conduitio/conduit-operator/pkg/validator"
-	"github.com/conduitio/conduit-operator/pkg/validator/mock"
+	"github.com/conduitio/conduit-operator/pkg/conduit"
+	"github.com/conduitio/conduit-operator/pkg/conduit/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +47,7 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(testname(tc.expectedErr, tc.ver), func(t *testing.T) {
 			is := is.New(t)
-			v := &ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
+			v := &ConduitCustomValidator{conduit.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
 
 			fieldErr := v.validateConduitVersion(tc.ver)
 			if tc.expectedErr != nil {
@@ -118,7 +118,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
-			v := ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
+			v := ConduitCustomValidator{conduit.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
 			conduit := tc.setup()
 
 			_, err := v.ValidateCreate(context.Background(), runtime.Object(conduit))
@@ -191,7 +191,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
-			v := ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
+			v := ConduitCustomValidator{conduit.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
 			conduit := tc.setup()
 
 			_, err := v.ValidateUpdate(context.Background(), runtime.Object(nil), runtime.Object(conduit))
@@ -211,7 +211,7 @@ func setupHTTPMockClient(t *testing.T) *mock.MockhttpClient {
 	defer ctrl.Finish()
 
 	mockClient := mock.NewMockhttpClient(ctrl)
-	validator.HTTPClient = mockClient
+	conduit.HTTPClient = mockClient
 
 	return mockClient
 }
