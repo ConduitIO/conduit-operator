@@ -2,11 +2,10 @@ package conduit
 
 import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 type ValidatorService interface {
-	ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path, logger logr.Logger) *field.Error
+	ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error
 	ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error
 }

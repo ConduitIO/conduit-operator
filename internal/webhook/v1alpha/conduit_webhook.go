@@ -35,7 +35,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	validation "github.com/conduitio/conduit-operator/pkg/conduit"
-	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -54,7 +53,7 @@ func init() {
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
 func SetupConduitWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{validation.NewValidator(), log.Log.WithName(validationLog)}).
+		WithValidator(&ConduitCustomValidator{validation.NewValidator(log.Log.WithName("webhook-validation"))}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
@@ -153,18 +152,12 @@ func (*ConduitCustomDefaulter) proccessorDefaulter(pp []*v1alpha.ConduitProcesso
 // when it is created, updated, or deleted.
 type ConduitCustomValidator struct {
 	validation.ValidatorService
-	Log logr.Logger
 }
 
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
 
-const validationLog = "webhook-validation-log"
-
 func NewConduitCustomValidator(validator validation.ValidatorService) *ConduitCustomValidator {
-	return &ConduitCustomValidator{
-		validator,
-		log.Log.WithName(validationLog),
-	}
+	return &ConduitCustomValidator{validator}
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
@@ -232,7 +225,7 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		if err := v.ValidateConnector(c, fp, v.Log); err != nil {
+		if err := v.ValidateConnector(c, fp); err != nil {
 			errs = append(errs, err)
 		}
 

@@ -32,21 +32,25 @@ type httpClient interface {
 
 var _ ValidatorService = (*Validator)(nil)
 
-type Validator struct{}
-
-func NewValidator() *Validator {
-	return &Validator{}
+type Validator struct {
+	Log logr.Logger
 }
 
-func (v *Validator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path, logger logr.Logger) *field.Error {
-	validations := []func(*v1alpha.ConduitConnector, *field.Path, logr.Logger) *field.Error{
+func NewValidator(log logr.Logger) *Validator {
+	return &Validator{
+		Log: log,
+	}
+}
+
+func (v *Validator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+	validations := []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
 		v.validateConnectorPlugin,
 		v.validateConnectorPluginType,
 		v.validateConnectorParameters,
 	}
 
 	for _, v := range validations {
-		if err := v(c, fp, logger); err != nil {
+		if err := v(c, fp); err != nil {
 			return err
 		}
 	}
@@ -60,27 +64,27 @@ func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *fie
 	return nil
 }
 
-func (v *Validator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
+func (v *Validator) validateConnectorPlugin(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := ValidatePlugin(c.Plugin); err != nil {
 		return field.Invalid(fp.Child("plugin"), c.Plugin, err.Error())
 	}
 	return nil
 }
 
-func (v *Validator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path, _ logr.Logger) *field.Error {
+func (v *Validator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if err := ValidatePluginType(c.Type); err != nil {
 		return field.Invalid(fp.Child("type"), c.Type, err.Error())
 	}
 	return nil
 }
 
-func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path, log logr.Logger) *field.Error {
+func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if !(c.Type == pconfig.TypeSource || c.Type == pconfig.TypeDestination) {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
-	spec, err := getPluginParameters(c, log)
+	spec, err := v.fetchYAMLSpec(c)
 	if err != nil {
-		log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
+		v.Log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
 		return nil
 	}
 
@@ -106,53 +110,46 @@ func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp 
 	return nil
 }
 
-func getPluginParameters(c *v1alpha.ConduitConnector, log logr.Logger) (func() sdk.Specification, error) {
-	body, err := getConnectorYaml(c, log)
-	if err != nil {
-		return func() sdk.Specification { return sdk.Specification{} }, err
-	}
-
-	return sdk.YAMLSpecification(body, c.PluginVersion), nil
-}
-
-// getConnectorYaml makes a call to conduit.io to get the connector.yaml
-// for the appropriate plugin
-func getConnectorYaml(c *v1alpha.ConduitConnector, log logr.Logger) (string, error) {
+// fetchYAMLSpec makes a call to conduit.io to get the connector.yaml
+// for the appropriate plugin. If this call fails, an empty spec is returned.
+func (v *Validator) fetchYAMLSpec(c *v1alpha.ConduitConnector) (func() sdk.Specification, error) {
 	ctx := context.Background()
+	emptySpecFn := func() sdk.Specification { return sdk.Specification{} }
 
-	cn, org := getConnectorInfo(c.PluginName)
-	ver, err := getPluginVersion(ctx, c.PluginVersion, cn, org, log)
+	cn, org := formatPluginName(c.PluginName)
+	ver, err := v.pluginVersion(ctx, c.PluginVersion, cn, org)
 	if err != nil {
-		return "", fmt.Errorf("getting plugin version with error %w", err)
+		return emptySpecFn, fmt.Errorf("getting plugin version with error %w", err)
 	}
 	connectorURL := fmt.Sprintf("%s/%s/%s@%s/connector.yaml", baseURL, org, cn, ver)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, connectorURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("creating the http request %w", err)
+		return emptySpecFn, fmt.Errorf("creating the http request %w", err)
 	}
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("getting yaml from cache with error %w", err)
+		return emptySpecFn, fmt.Errorf("getting yaml from cache with error %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("getting yaml, status code %d", resp.StatusCode)
+		return emptySpecFn, fmt.Errorf("getting yaml, status code %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("reading response body %w", err)
+		return emptySpecFn, fmt.Errorf("reading response body %w", err)
 	}
-	return string(body), nil
+
+	return sdk.YAMLSpecification(string(body), c.PluginVersion), nil
 }
 
-// getConnectorInfo converts the connector string into the format
+// formatPluginName converts the plugin name into the format
 // "conduit-connector-connectorName" to match the name in github
 // Returns the github organization and the transformed connector name
-func getConnectorInfo(pn string) (string, string) {
+func formatPluginName(pn string) (string, string) {
 	parts := strings.Split(strings.TrimPrefix(strings.ToLower(pn), "github.com/"), "/")
 
 	org, name := "", ""
@@ -175,9 +172,9 @@ func getConnectorInfo(pn string) (string, string) {
 	return org, name
 }
 
-// getPluginVersion will either return the ver in the parameter or parse a version "latest"
+// pluginVersion will either return the ver in the parameter or parse a version "latest"
 // into the latest version number
-func getPluginVersion(ctx context.Context, ver string, n string, org string, log logr.Logger) (string, error) {
+func (v *Validator) pluginVersion(ctx context.Context, ver string, n string, org string) (string, error) {
 	if ver == "latest" {
 		pluginURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", org, n)
 
@@ -202,7 +199,7 @@ func getPluginVersion(ctx context.Context, ver string, n string, org string, log
 			return "", err
 		}
 
-		log.Info("Connector plugin %s set to version 'latest', version %s found", n, rel.TagName)
+		v.Log.Info("Connector plugin %s set to version 'latest', version %s found", n, rel.TagName)
 		return rel.TagName, nil
 	}
 

@@ -53,9 +53,9 @@ func TestValidator_ConnectorPlugin(t *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
 			logger := testr.New(t)
-			v := NewValidator()
+			v := NewValidator(logger)
 
-			err := v.ValidateConnector(c.Spec.Connectors[0], fp, logger)
+			err := v.ValidateConnector(c.Spec.Connectors[0], fp)
 			if tc.wantErr != nil {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
@@ -98,9 +98,9 @@ func TestValidator_ConnectorPluginType(t *testing.T) {
 			c := tc.setup()
 			logger := testr.New(t)
 			fp := field.NewPath("spec").Child("connectors")
-			v := NewValidator()
+			v := NewValidator(logger)
 
-			err := v.ValidateConnector(c.Spec.Connectors[0], fp, logger)
+			err := v.ValidateConnector(c.Spec.Connectors[0], fp)
 			if tc.wantErr != nil {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
@@ -141,7 +141,8 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 			is := is.New(t)
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("processors")
-			v := NewValidator()
+			logger := testr.New(t)
+			v := NewValidator(logger)
 
 			err := v.ValidateProcessorPlugin(c.Spec.Processors[0], fp)
 			if tc.wantErr != nil {
@@ -241,9 +242,9 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
 			logger := testr.New(t)
-			v := NewValidator()
+			v := NewValidator(logger)
 
-			err := v.ValidateConnector(c, fp, logger)
+			err := v.ValidateConnector(c, fp)
 			if tc.wantErr != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
