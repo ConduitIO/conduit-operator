@@ -36,12 +36,11 @@ import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	internalconduit "github.com/conduitio/conduit-operator/internal/conduit"
 	"github.com/conduitio/conduit-operator/pkg/validator"
+	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var conduitVerConstraint *semver.Constraints
-
-var webhookLog = log.Log.WithName("webhook")
 
 func init() {
 	var err error
@@ -56,7 +55,7 @@ func init() {
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
 func SetupConduitWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{validator.NewConduitValidator()}).
+		WithValidator(&ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
@@ -154,13 +153,17 @@ func (*ConduitCustomDefaulter) proccessorDefaulter(pp []*v1alpha.ConduitProcesso
 // ConduitCustomValidator struct is responsible for validating the Conduit resource
 // when it is created, updated, or deleted.
 type ConduitCustomValidator struct {
-	validationService validator.Validator
+	validator.Validator
+	Log logr.Logger
 }
 
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
 
 func NewConduitCustomValidator(validator validator.Validator) *ConduitCustomValidator {
-	return &ConduitCustomValidator{validationService: validator}
+	return &ConduitCustomValidator{
+		validator,
+		log.Log.WithName("webhook-validation-log"),
+	}
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
@@ -228,7 +231,7 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		if err := v.validationService.ValidateConnector(c, fp, webhookLog); err != nil {
+		if err := v.ValidateConnector(c, fp, v.Log); err != nil {
 			errs = append(errs, err)
 		}
 
@@ -248,7 +251,7 @@ func (v *ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcess
 	var errs field.ErrorList
 
 	for _, p := range pp {
-		if err := v.validationService.ValidateProcessorPlugin(p, fp); err != nil {
+		if err := v.ValidateProcessorPlugin(p, fp); err != nil {
 			errs = append(errs, err)
 		}
 	}

@@ -20,6 +20,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 //go:embed testdata/connector-example.yaml
@@ -46,7 +47,7 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(testname(tc.expectedErr, tc.ver), func(t *testing.T) {
 			is := is.New(t)
-			v := &ConduitCustomValidator{validator.NewConduitValidator()}
+			v := &ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
 
 			fieldErr := v.validateConduitVersion(tc.ver)
 			if tc.expectedErr != nil {
@@ -117,7 +118,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
-			v := ConduitCustomValidator{validator.NewConduitValidator()}
+			v := ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
 			conduit := tc.setup()
 
 			_, err := v.ValidateCreate(context.Background(), runtime.Object(conduit))
@@ -190,7 +191,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
-			v := ConduitCustomValidator{validator.NewConduitValidator()}
+			v := ConduitCustomValidator{validator.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}
 			conduit := tc.setup()
 
 			_, err := v.ValidateUpdate(context.Background(), runtime.Object(nil), runtime.Object(conduit))
