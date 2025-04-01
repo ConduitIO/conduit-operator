@@ -108,7 +108,7 @@ func (v *ConduitValidator) validateConnectorParameters(c *v1alpha.ConduitConnect
 }
 
 func getPluginParameters(c *v1alpha.ConduitConnector, log logr.Logger) (func() sdk.Specification, error) {
-	body, err := getCachedYaml(c, log)
+	body, err := getConnectorYaml(c, log)
 	if err != nil {
 		return func() sdk.Specification { return sdk.Specification{} }, err
 	}
@@ -116,9 +116,9 @@ func getPluginParameters(c *v1alpha.ConduitConnector, log logr.Logger) (func() s
 	return sdk.YAMLSpecification(body, c.PluginVersion), nil
 }
 
-// getCachedYaml makes a call to conduit.io to get the connector.yaml
+// getConnectorYaml makes a call to conduit.io to get the connector.yaml
 // for the appropriate plugin
-func getCachedYaml(c *v1alpha.ConduitConnector, log logr.Logger) (string, error) {
+func getConnectorYaml(c *v1alpha.ConduitConnector, log logr.Logger) (string, error) {
 	ctx := context.Background()
 
 	cn, org := getConnectorInfo(c.PluginName)
