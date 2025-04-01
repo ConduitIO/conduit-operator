@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -154,29 +153,26 @@ func getConnectorYaml(c *v1alpha.ConduitConnector, log logr.Logger) (string, err
 // "conduit-connector-connectorName" to match the name in github
 // Returns the github organization and the transformed connector name
 func getConnectorInfo(pn string) (string, string) {
-	trimmedName := strings.ToLower(pn)
-	trimmedName = strings.TrimPrefix(trimmedName, "github.com/")
+	parts := strings.Split(strings.TrimPrefix(strings.ToLower(pn), "github.com/"), "/")
 
-	prefixPattern := "[A-Za-z0-9_.-]/[A-Za-z0-9_.-]"
-	hasPrefix, err := regexp.MatchString(prefixPattern, trimmedName)
-	if err != nil {
-		return "", ""
-	}
-	if hasPrefix {
-		info := strings.Split(trimmedName, "/")
-		return info[0], info[1]
-	}
+	org, name := "", ""
+	switch len(parts) {
+	case 1:
+		// handle transforming "builtin:connector" to desired format
+		trimmedName := strings.TrimPrefix(parts[0], "builtin:")
+		if slices.Contains(
+			BuiltinConnectors,
+			trimmedName,
+		) {
+			return fmt.Sprintf("conduit-connector-%s", trimmedName), conduitOrg
+		}
 
-	// handle transforming "builtin:connector" to desired format
-	trimmedName = strings.TrimPrefix(trimmedName, "builtin:")
-	if slices.Contains(
-		BuiltinConnectors,
-		trimmedName,
-	) {
-		return fmt.Sprintf("conduit-connector-%s", trimmedName), conduitOrg
+		name = trimmedName
+	case 2:
+		org, name = parts[0], parts[1]
 	}
 
-	return "", pn
+	return org, name
 }
 
 // getPluginVersion will either return the ver in the parameter or parse a version "latest"
