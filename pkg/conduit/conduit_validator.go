@@ -15,6 +15,7 @@ import (
 	"github.com/conduitio/conduit-commons/config"
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	pconfig "github.com/conduitio/conduit/pkg/provisioning/config"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -34,7 +35,7 @@ var _ ValidatorService = (*Validator)(nil)
 
 type Validator struct{}
 
-func NewConduitValidator() *Validator {
+func NewValidator() *Validator {
 	return &Validator{}
 }
 
@@ -75,7 +76,7 @@ func (v *Validator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp 
 }
 
 func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path, log logr.Logger) *field.Error {
-	if !(c.Type == "source" || c.Type == "destination") {
+	if !(c.Type == pconfig.TypeSource || c.Type == pconfig.TypeDestination) {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
 	spec, err := getPluginParameters(c, log)
@@ -91,12 +92,12 @@ func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp 
 
 	config := config.Config(settings)
 
-	if c.Type == "source" {
+	if c.Type == pconfig.TypeSource {
 		err = config.Validate(spec().SourceParams)
 		if err != nil {
 			return field.Invalid(fp.Child("parameter"), c.Type, err.Error())
 		}
-	} else if c.Type == "destination" {
+	} else if c.Type == pconfig.TypeDestination {
 		err = config.Validate(spec().DestinationParams)
 		if err != nil {
 			return field.Invalid(fp.Child("parameter"), c.Type, err.Error())

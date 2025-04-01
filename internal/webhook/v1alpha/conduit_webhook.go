@@ -54,7 +54,7 @@ func init() {
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
 func SetupConduitWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{validation.NewConduitValidator(), log.Log.WithName("webhook-validation-log")}).
+		WithValidator(&ConduitCustomValidator{validation.NewValidator(), log.Log.WithName(validationLog)}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
@@ -158,10 +158,12 @@ type ConduitCustomValidator struct {
 
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
 
+const validationLog = "webhook-validation-log"
+
 func NewConduitCustomValidator(validator validation.ValidatorService) *ConduitCustomValidator {
 	return &ConduitCustomValidator{
 		validator,
-		log.Log.WithName("webhook-validation-log"),
+		log.Log.WithName(validationLog),
 	}
 }
 
