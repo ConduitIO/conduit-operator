@@ -116,12 +116,15 @@ func (v *Validator) fetchYAMLSpec(c *v1alpha.ConduitConnector) (func() sdk.Speci
 	ctx := context.Background()
 	emptySpecFn := func() sdk.Specification { return sdk.Specification{} }
 
-	cn, org := formatPluginName(c.PluginName)
-	ver, err := v.pluginVersion(ctx, c.PluginVersion, cn, org)
+	pluginInfo, err := formatPluginName(c.PluginName)
+	if err != nil {
+		return emptySpecFn, fmt.Errorf("unable to format plugin name %w", err)
+	}
+	pluginInfo.Version, err = v.pluginVersion(ctx, c.PluginVersion, pluginInfo)
 	if err != nil {
 		return emptySpecFn, fmt.Errorf("getting plugin version with error %w", err)
 	}
-	connectorURL := fmt.Sprintf("%s/%s/%s@%s/connector.yaml", baseURL, org, cn, ver)
+	connectorURL := fmt.Sprintf("%s/%s/%s@%s/connector.yaml", baseURL, pluginInfo.Org, pluginInfo.Name, pluginInfo.Version)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, connectorURL, nil)
 	if err != nil {
@@ -146,13 +149,19 @@ func (v *Validator) fetchYAMLSpec(c *v1alpha.ConduitConnector) (func() sdk.Speci
 	return sdk.YAMLSpecification(string(body), c.PluginVersion), nil
 }
 
+type PluginInfo struct {
+	Name    string
+	Org     string
+	Version string
+}
+
 // formatPluginName converts the plugin name into the format
 // "conduit-connector-connectorName" to match the name in github
 // Returns the github organization and the transformed connector name
-func formatPluginName(pn string) (string, string) {
+func formatPluginName(pn string) (PluginInfo, error) {
 	parts := strings.Split(strings.TrimPrefix(strings.ToLower(pn), "github.com/"), "/")
+	info := PluginInfo{}
 
-	org, name := "", ""
 	switch len(parts) {
 	case 1:
 		// handle transforming "builtin:connector" to desired format
@@ -161,22 +170,22 @@ func formatPluginName(pn string) (string, string) {
 			BuiltinConnectors,
 			trimmedName,
 		) {
-			return fmt.Sprintf("conduit-connector-%s", trimmedName), conduitOrg
+			info.Org, info.Name = conduitOrg, fmt.Sprintf("conduit-connector-%s", trimmedName)
+		} else {
+			return info, fmt.Errorf("unable to find organization name for plugin name %s", pn)
 		}
-
-		name = trimmedName
 	case 2:
-		org, name = parts[0], parts[1]
+		info.Org, info.Name = parts[0], parts[1]
 	}
 
-	return org, name
+	return info, nil
 }
 
 // pluginVersion will either return the ver in the parameter or parse a version "latest"
 // into the latest version number
-func (v *Validator) pluginVersion(ctx context.Context, ver string, n string, org string) (string, error) {
+func (v *Validator) pluginVersion(ctx context.Context, ver string, info PluginInfo) (string, error) {
 	if ver == "latest" {
-		pluginURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", org, n)
+		pluginURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", info.Org, info.Name)
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pluginURL, nil)
 		if err != nil {
@@ -199,7 +208,7 @@ func (v *Validator) pluginVersion(ctx context.Context, ver string, n string, org
 			return "", err
 		}
 
-		v.Log.Info("Connector plugin %s set to version 'latest', version %s found", n, rel.TagName)
+		v.Log.Info("Connector plugin %s set to version 'latest', version %s found", info.Name, rel.TagName)
 		return rel.TagName, nil
 	}
 
