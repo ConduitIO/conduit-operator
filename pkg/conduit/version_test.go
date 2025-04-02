@@ -1,10 +1,9 @@
-package conduit_test
+package conduit
 
 import (
 	"testing"
 
 	"github.com/conduitio/conduit-operator/api/v1alpha"
-	"github.com/conduitio/conduit-operator/internal/conduit"
 	"github.com/matryer/is"
 	"github.com/pkg/errors"
 )
@@ -77,11 +76,11 @@ func Test_ForVersion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
 
-			flags := conduit.NewFlags(
-				conduit.WithPipelineFile(v1alpha.ConduitPipelineFile),
-				conduit.WithConnectorsPath(v1alpha.ConduitConnectorsPath),
-				conduit.WithDBPath(v1alpha.ConduitDBPath),
-				conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
+			flags := NewFlags(
+				WithPipelineFile(v1alpha.ConduitPipelineFile),
+				WithConnectorsPath(v1alpha.ConduitConnectorsPath),
+				WithDBPath(v1alpha.ConduitDBPath),
+				WithProcessorsPath(v1alpha.ConduitProcessorsPath),
 			)
 			args, err := flags.ForVersion(tc.version)
 			if err != nil {

@@ -34,7 +34,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	internalconduit "github.com/conduitio/conduit-operator/internal/conduit"
+	validation "github.com/conduitio/conduit-operator/pkg/conduit"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var conduitVerConstraint *semver.Constraints
@@ -52,7 +53,7 @@ func init() {
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
 func SetupConduitWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{}).
+		WithValidator(&ConduitCustomValidator{validation.NewValidator(log.Log.WithName("webhook-validation"))}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
@@ -115,7 +116,7 @@ func (d *ConduitCustomDefaulter) Default(_ context.Context, obj runtime.Object) 
 		plugin := strings.ToLower(c.Plugin)
 
 		switch {
-		case slices.Contains(internalconduit.BuiltinConnectors, plugin):
+		case slices.Contains(validation.BuiltinConnectors, plugin):
 			c.Plugin = "builtin:" + plugin
 			c.PluginName = c.Plugin
 		case strings.HasPrefix(plugin, "builtin:"):
@@ -149,9 +150,15 @@ func (*ConduitCustomDefaulter) proccessorDefaulter(pp []*v1alpha.ConduitProcesso
 
 // ConduitCustomValidator struct is responsible for validating the Conduit resource
 // when it is created, updated, or deleted.
-type ConduitCustomValidator struct{}
+type ConduitCustomValidator struct {
+	validation.ValidatorService
+}
 
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
+
+func NewConduitCustomValidator(validator validation.ValidatorService) *ConduitCustomValidator {
+	return &ConduitCustomValidator{validator}
+}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
 func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
@@ -218,10 +225,8 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		for _, fn := range connectorValidators {
-			if err := fn(c, fp); err != nil {
-				errs = append(errs, err)
-			}
+		if err := v.ValidateConnector(c, fp); err != nil {
+			errs = append(errs, err)
 		}
 
 		if procErrs := v.validateProcessors(c.Processors, fp); procErrs != nil {
@@ -236,11 +241,11 @@ func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnect
 	return nil
 }
 
-func (*ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcessor, fp *field.Path) field.ErrorList {
+func (v *ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcessor, fp *field.Path) field.ErrorList {
 	var errs field.ErrorList
 
 	for _, p := range pp {
-		if err := validateProcessorPlugin(p, fp); err != nil {
+		if err := v.ValidateProcessorPlugin(p, fp); err != nil {
 			errs = append(errs, err)
 		}
 	}
