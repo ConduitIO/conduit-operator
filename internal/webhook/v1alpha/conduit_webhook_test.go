@@ -63,7 +63,6 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpResps := conduit.GetHTTPResps(t)
-				// TODO why no list
 				gomock.InOrder(
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
