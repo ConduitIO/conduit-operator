@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -191,7 +192,8 @@ func main() {
 		fatal(err, "unable to start manager")
 	}
 
-	if err = webhookv1alpha.SetupConduitWebhookWithManager(mgr); err != nil {
+	ctx := context.Background()
+	if err = webhookv1alpha.SetupConduitWebhookWithManager(ctx, mgr); err != nil {
 		fatal(err, "unable to create webhook", "webhook", "Conduit")
 	}
 

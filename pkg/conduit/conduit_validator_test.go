@@ -2,24 +2,19 @@ package conduit
 
 import (
 	"bytes"
-	_ "embed"
+	"context"
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
-	"github.com/conduitio/conduit-operator/pkg/conduit/mock"
 	"github.com/go-logr/logr/testr"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
-
-//go:embed testdata/connector-example.yaml
-var connectorYAML string
 
 func TestValidator_ConnectorPlugin(t *testing.T) {
 	tests := []struct {
@@ -53,9 +48,10 @@ func TestValidator_ConnectorPlugin(t *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
 			logger := testr.New(t)
-			v := NewValidator(logger)
+			ctx := context.Background()
+			v := NewValidator(ctx, logger)
 
-			err := v.ValidateConnector(c.Spec.Connectors[0], fp)
+			err := v.ValidateConnector(ctx, c.Spec.Connectors[0], fp)
 			if tc.wantErr != nil {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
@@ -98,9 +94,10 @@ func TestValidator_ConnectorPluginType(t *testing.T) {
 			c := tc.setup()
 			logger := testr.New(t)
 			fp := field.NewPath("spec").Child("connectors")
-			v := NewValidator(logger)
+			ctx := context.Background()
+			v := NewValidator(ctx, logger)
 
-			err := v.ValidateConnector(c.Spec.Connectors[0], fp)
+			err := v.ValidateConnector(ctx, c.Spec.Connectors[0], fp)
 			if tc.wantErr != nil {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
@@ -142,7 +139,8 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("processors")
 			logger := testr.New(t)
-			v := NewValidator(logger)
+			ctx := context.Background()
+			v := NewValidator(ctx, logger)
 
 			err := v.ValidateProcessorPlugin(c.Spec.Processors[0], fp)
 			if tc.wantErr != nil {
@@ -169,12 +167,12 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			setup: func() *v1alpha.ConduitConnector {
 				conduit := testutil.SetupSampleConduit(t)
 
-				webClient := setupHTTPMockClient(t)
-				httpResps := getHTTPResps()
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
 
 				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 				)
 
 				return conduit.Spec.Connectors[0]
@@ -185,12 +183,12 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			setup: func() *v1alpha.ConduitConnector {
 				conduit := testutil.SetupSampleConduit(t)
 
-				webClient := setupHTTPMockClient(t)
-				httpResps := getHTTPResps()
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
 
 				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 				)
 
 				return conduit.Spec.Connectors[1]
@@ -201,7 +199,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			setup: func() *v1alpha.ConduitConnector {
 				conduit := testutil.SetupBadNameConduit(t)
 
-				webClient := setupHTTPMockClient(t)
+				webClient := SetupHTTPMockClient(t)
 				respFn := func(_ *http.Request) (*http.Response, error) {
 					resp := &http.Response{
 						StatusCode: http.StatusNotFound,
@@ -223,11 +221,26 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			setup: func() *v1alpha.ConduitConnector {
 				conduit := testutil.SetupSampleConduit(t)
 
-				webClient := setupHTTPMockClient(t)
-				httpResps := getHTTPResps()
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
 
 				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+				)
+
+				return conduit.Spec.Connectors[0]
+			},
+			wantErr: nil,
+		},
+		{
+			name: "error constructing connector list",
+			setup: func() *v1alpha.ConduitConnector {
+				conduit := testutil.SetupSampleConduit(t)
+
+				webClient := SetupHTTPMockClient(t)
+
+				gomock.InOrder(
 					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
 				)
 
@@ -242,9 +255,10 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			c := tc.setup()
 			fp := field.NewPath("spec").Child("connectors")
 			logger := testr.New(t)
-			v := NewValidator(logger)
+			ctx := context.Background()
+			v := NewValidator(ctx, logger)
 
-			err := v.ValidateConnector(c, fp)
+			err := v.ValidateConnector(ctx, c, fp)
 			if tc.wantErr != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
@@ -252,39 +266,4 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			}
 		})
 	}
-}
-
-func setupHTTPMockClient(t *testing.T) *mock.MockhttpClient {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mock.NewMockhttpClient(ctrl)
-	HTTPClient = mockClient
-
-	return mockClient
-}
-
-//nolint:bodyclose // Body is closed in the validator, bodyclose is not recognizing this.
-func getHTTPResps() []func(*http.Request) (*http.Response, error) {
-	var resps []func(*http.Request) (*http.Response, error)
-
-	respFn := func(_ *http.Request) (*http.Response, error) {
-		resp := &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString("{\"tag_name\": \"v0.10.1\"}")),
-		}
-		return resp, nil
-	}
-	resps = append(resps, respFn)
-
-	respFn = func(_ *http.Request) (*http.Response, error) {
-		resp := &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(strings.NewReader(connectorYAML)),
-		}
-		return resp, nil
-	}
-	resps = append(resps, respFn)
-
-	return resps
 }
