@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	baseURL    = "https://conduit.io/connectors/github.com"
-	conduitOrg = "conduitio"
+	baseURL      = "https://conduit.io/connectors/github.com"
+	connectorURL = "https://conduit.io/connectors.json"
+	conduitOrg   = "conduitio"
 )
 
 var HTTPClient httpClient = http.DefaultClient
@@ -32,21 +33,46 @@ type httpClient interface {
 
 var _ ValidatorService = (*Validator)(nil)
 
-type Validator struct {
-	Log logr.Logger
+type PluginInfo struct {
+	Name    string
+	Org     string
+	URL     string
+	Version string
 }
 
-func NewValidator(log logr.Logger) *Validator {
+type Validator struct {
+	Log           logr.Logger
+	ConnectorList map[string]PluginInfo
+}
+
+type ConnectorInfo struct {
+	Name     string     `json:"name_with_owner"`
+	URL      string     `json:"url"`
+	Releases []Releases `json:"releases"`
+}
+
+type Releases struct {
+	Name   string `json:"name"`
+	Latest bool   `json:"is_latest"`
+}
+
+func NewValidator(ctx context.Context, log logr.Logger) *Validator {
+	plugins, err := connectorList(ctx)
+	if err != nil {
+		log.Error(err, "unable to construct connector validation list %w")
+		plugins = nil
+	}
+
 	return &Validator{
-		Log: log,
+		Log:           log,
+		ConnectorList: plugins,
 	}
 }
 
-func (v *Validator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *Validator) ValidateConnector(ctx context.Context, c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	validations := []func(*v1alpha.ConduitConnector, *field.Path) *field.Error{
 		v.validateConnectorPlugin,
 		v.validateConnectorPluginType,
-		v.validateConnectorParameters,
 	}
 
 	for _, v := range validations {
@@ -54,6 +80,11 @@ func (v *Validator) ValidateConnector(c *v1alpha.ConduitConnector, fp *field.Pat
 			return err
 		}
 	}
+
+	if err := v.validateConnectorParameters(ctx, c, fp); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -78,11 +109,26 @@ func (v *Validator) validateConnectorPluginType(c *v1alpha.ConduitConnector, fp 
 	return nil
 }
 
-func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
+func (v *Validator) validateConnectorParameters(ctx context.Context, c *v1alpha.ConduitConnector, fp *field.Path) *field.Error {
 	if !(c.Type == pconfig.TypeSource || c.Type == pconfig.TypeDestination) {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
-	spec, err := v.fetchYAMLSpec(c)
+	if len(v.ConnectorList) == 0 {
+		v.Log.Info("connector list is empty, skipping parameter validation")
+		return nil
+	}
+
+	plugin, err := v.filterConnector(c.PluginName)
+	if err != nil {
+		v.Log.Error(err, "error filtering connector from list")
+		return nil
+	}
+	if plugin == nil {
+		v.Log.Error(err, fmt.Sprintf("connector %s not listed in cache", c.Name))
+		return nil
+	}
+
+	spec, err := v.fetchYAMLSpec(ctx, c, plugin)
 	if err != nil {
 		v.Log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
 		return nil
@@ -112,20 +158,13 @@ func (v *Validator) validateConnectorParameters(c *v1alpha.ConduitConnector, fp 
 
 // fetchYAMLSpec makes a call to conduit.io to get the connector.yaml
 // for the appropriate plugin. If this call fails, an empty spec is returned.
-func (v *Validator) fetchYAMLSpec(c *v1alpha.ConduitConnector) (func() sdk.Specification, error) {
-	ctx := context.Background()
+func (v *Validator) fetchYAMLSpec(ctx context.Context, c *v1alpha.ConduitConnector, plugin *PluginInfo) (func() sdk.Specification, error) {
 	emptySpecFn := func() sdk.Specification { return sdk.Specification{} }
-
-	pluginInfo, err := formatPluginName(c.PluginName)
-	if err != nil {
-		return emptySpecFn, fmt.Errorf("unable to format plugin name %w", err)
+	if plugin.Version == "" {
+		return emptySpecFn, fmt.Errorf("no version found for connector %s", plugin.Name)
 	}
-	pluginInfo.Version, err = v.pluginVersion(ctx, c.PluginVersion, pluginInfo)
-	if err != nil {
-		return emptySpecFn, fmt.Errorf("getting plugin version with error %w", err)
-	}
-	connectorURL := fmt.Sprintf("%s/%s/%s@%s/connector.yaml", baseURL, pluginInfo.Org, pluginInfo.Name, pluginInfo.Version)
 
+	connectorURL := fmt.Sprintf("%s/%s/%s@%s/connector.yaml", baseURL, plugin.Org, plugin.Name, plugin.Version)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, connectorURL, nil)
 	if err != nil {
 		return emptySpecFn, fmt.Errorf("creating the http request %w", err)
@@ -149,18 +188,11 @@ func (v *Validator) fetchYAMLSpec(c *v1alpha.ConduitConnector) (func() sdk.Speci
 	return sdk.YAMLSpecification(string(body), c.PluginVersion), nil
 }
 
-type PluginInfo struct {
-	Name    string
-	Org     string
-	Version string
-}
-
 // formatPluginName converts the plugin name into the format
-// "conduit-connector-connectorName" to match the name in github
+// "conduit-connector-connectorName"
 // Returns the github organization and the transformed connector name
-func formatPluginName(pn string) (PluginInfo, error) {
+func formatPluginName(pn string) (string, error) {
 	parts := strings.Split(strings.TrimPrefix(strings.ToLower(pn), "github.com/"), "/")
-	info := PluginInfo{}
 
 	switch len(parts) {
 	case 1:
@@ -170,47 +202,86 @@ func formatPluginName(pn string) (PluginInfo, error) {
 			BuiltinConnectors,
 			trimmedName,
 		) {
-			info.Org, info.Name = conduitOrg, fmt.Sprintf("conduit-connector-%s", trimmedName)
-		} else {
-			return info, fmt.Errorf("unable to find organization name for plugin name %s", pn)
+			return fmt.Sprintf("conduit-connector-%s", trimmedName), nil
 		}
 	case 2:
-		info.Org, info.Name = parts[0], parts[1]
+		return parts[1], nil
 	}
 
-	return info, nil
+	return "", nil
 }
 
-// pluginVersion will either return the ver in the parameter or parse a version "latest"
-// into the latest version number
-func (v *Validator) pluginVersion(ctx context.Context, ver string, info PluginInfo) (string, error) {
-	if ver == "latest" {
-		pluginURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", info.Org, info.Name)
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, pluginURL, nil)
-		if err != nil {
-			return "", err
-		}
-
-		resp, err := HTTPClient.Do(req)
-		if err != nil {
-			return "", err
-		}
-		if resp.StatusCode != http.StatusOK {
-			return "", fmt.Errorf("getting latest release with status code: %d", resp.StatusCode)
-		}
-		defer resp.Body.Close()
-
-		var rel struct {
-			TagName string `json:"tag_name"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-			return "", err
-		}
-
-		v.Log.Info("Connector plugin %s set to version 'latest', version %s found", info.Name, rel.TagName)
-		return rel.TagName, nil
+// connectorList constructs a dictionary of connectors with information for
+// use by the validator. Skips any connectors with improper name formmatting or
+// are not in allowed orgs.
+func connectorList(ctx context.Context) (map[string]PluginInfo, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, connectorURL, nil)
+	if err != nil {
+		return nil, err
 	}
 
-	return ver, nil
+	resp, err := HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// parse response into a dictionary to look up values
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var connectors []ConnectorInfo
+	err = json.Unmarshal(body, &connectors)
+	if err != nil {
+		return nil, err
+	}
+
+	plugins := make(map[string]PluginInfo)
+	for _, c := range connectors {
+		parts := strings.Split(strings.ToLower(c.Name), "/")
+		if len(parts) != 2 {
+			continue
+		}
+
+		org := parts[0]
+		if !slices.Contains(allowedGitHubOrgs, fmt.Sprintf("%s/", org)) {
+			continue
+		}
+
+		plugin := PluginInfo{
+			Name: parts[1],
+			Org:  org,
+			URL:  c.URL,
+		}
+		for _, rel := range c.Releases {
+			if rel.Latest {
+				plugin.Version = rel.Name
+				break
+			}
+		}
+
+		plugins[plugin.Name] = plugin
+	}
+
+	return plugins, nil
+}
+
+func (v *Validator) filterConnector(n string) (*PluginInfo, error) {
+	pluginName, err := formatPluginName(n)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, p := range v.ConnectorList {
+		if strings.Contains(p.Name, pluginName) {
+			return &p, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no matching plugin found in cache")
 }

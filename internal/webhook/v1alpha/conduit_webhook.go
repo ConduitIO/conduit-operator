@@ -51,9 +51,9 @@ func init() {
 }
 
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
-func SetupConduitWebhookWithManager(mgr ctrl.Manager) error {
+func SetupConduitWebhookWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{validation.NewValidator(log.Log.WithName("webhook-validation"))}).
+		WithValidator(&ConduitCustomValidator{validation.NewValidator(ctx, log.Log.WithName("webhook-validation"))}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
@@ -161,7 +161,7 @@ func NewConduitCustomValidator(validator validation.ValidatorService) *ConduitCu
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
-func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.Object) (admission.Warnings, error) {
+func (v *ConduitCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
 	conduit, ok := obj.(*v1alpha.Conduit)
 	if !ok {
 		return nil, fmt.Errorf("expected a Conduit object but got %T", obj)
@@ -173,7 +173,7 @@ func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 		errs = append(errs, err)
 	}
 
-	if verrs := v.validateConnectors(conduit.Spec.Connectors); len(verrs) > 0 {
+	if verrs := v.validateConnectors(ctx, conduit.Spec.Connectors); len(verrs) > 0 {
 		errs = append(errs, verrs...)
 	}
 
@@ -196,13 +196,13 @@ func (v *ConduitCustomValidator) ValidateCreate(_ context.Context, obj runtime.O
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
-func (v *ConduitCustomValidator) ValidateUpdate(_ context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
+func (v *ConduitCustomValidator) ValidateUpdate(ctx context.Context, _, newObj runtime.Object) (admission.Warnings, error) {
 	conduit, ok := newObj.(*v1alpha.Conduit)
 	if !ok {
 		return nil, fmt.Errorf("expected a Conduit object for the newObj but got %T", newObj)
 	}
 
-	if errs := v.validateConnectors(conduit.Spec.Connectors); len(errs) > 0 {
+	if errs := v.validateConnectors(ctx, conduit.Spec.Connectors); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
 	}
 
@@ -220,12 +220,12 @@ func (v *ConduitCustomValidator) ValidateDelete(_ context.Context, obj runtime.O
 
 // validateConnectors validates the attributes of connectors in the slice.
 // Error is return when the validation fails.
-func (v *ConduitCustomValidator) validateConnectors(cc []*v1alpha.ConduitConnector) field.ErrorList {
+func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v1alpha.ConduitConnector) field.ErrorList {
 	var errs field.ErrorList
 
 	fp := field.NewPath("spec").Child("connectors")
 	for _, c := range cc {
-		if err := v.ValidateConnector(c, fp); err != nil {
+		if err := v.ValidateConnector(ctx, c, fp); err != nil {
 			errs = append(errs, err)
 		}
 

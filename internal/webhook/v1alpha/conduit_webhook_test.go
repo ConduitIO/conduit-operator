@@ -1,20 +1,14 @@
 package v1alpha
 
 import (
-	"bytes"
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
 	"testing"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
 	"github.com/conduitio/conduit-operator/pkg/conduit"
-	"github.com/conduitio/conduit-operator/pkg/conduit/mock"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -22,9 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
-
-//go:embed testdata/connector-example.yaml
-var connectorYAML string
 
 func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	tests := []struct {
@@ -47,7 +38,8 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(testname(tc.expectedErr, tc.ver), func(t *testing.T) {
 			is := is.New(t)
-			v := &ConduitCustomValidator{conduit.NewValidator(log.Log.WithName("webhook-validation"))}
+			ctx := context.Background()
+			v := &ConduitCustomValidator{conduit.NewValidator(ctx, log.Log.WithName("webhook-validation"))}
 
 			fieldErr := v.validateConduitVersion(tc.ver)
 			if tc.expectedErr != nil {
@@ -60,7 +52,6 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	}
 }
 
-//nolint:bodyclose
 func TestWebhook_ValidateCreate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -70,13 +61,12 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 		{
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
-				webClient := setupHTTPMockClient(t)
-				httpResps := getHTTPResps()
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
 				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 				)
 
 				return testutil.SetupSampleConduit(t)
@@ -85,7 +75,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 		{
 			name: "error occurs on http call",
 			setup: func() *v1alpha.Conduit {
-				webClient := setupHTTPMockClient(t)
+				webClient := conduit.SetupHTTPMockClient(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
 				return testutil.SetupSampleConduit(t)
@@ -95,12 +85,12 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 		{
 			name: "error occurs during validation",
 			setup: func() *v1alpha.Conduit {
-				webClient := setupHTTPMockClient(t)
-				httpResps := getHTTPResps()
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
 				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 				)
 
 				return testutil.SetupBadValidationConduit(t)
@@ -118,10 +108,11 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
-			v := ConduitCustomValidator{conduit.NewValidator(log.Log.WithName("webhook-validation"))}
-			conduit := tc.setup()
+			ctx := context.Background()
+			c := tc.setup()
+			v := ConduitCustomValidator{conduit.NewValidator(ctx, log.Log.WithName("webhook-validation"))}
 
-			_, err := v.ValidateCreate(context.Background(), runtime.Object(conduit))
+			_, err := v.ValidateCreate(context.Background(), runtime.Object(c))
 
 			if tc.wantErr != nil {
 				is.True(err != nil)
@@ -133,7 +124,6 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 	}
 }
 
-//nolint:bodyclose
 func TestWebhook_ValidateUpdate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -143,13 +133,12 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 		{
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
-				webClient := setupHTTPMockClient(t)
-				httpFnResps := getHTTPResps()
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpFnResps := conduit.GetHTTPResps(t)
 				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[1]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
 				)
 
 				return testutil.SetupSampleConduit(t)
@@ -158,7 +147,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 		{
 			name: "error occurs on http call",
 			setup: func() *v1alpha.Conduit {
-				webClient := setupHTTPMockClient(t)
+				webClient := conduit.SetupHTTPMockClient(t)
 				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
 
 				return testutil.SetupSampleConduit(t)
@@ -168,12 +157,12 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 		{
 			name: "error occurs during validation",
 			setup: func() *v1alpha.Conduit {
-				webClient := setupHTTPMockClient(t)
-				httpResps := getHTTPResps()
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpFnResps := conduit.GetHTTPResps(t)
 				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[0]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps[1]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
 				)
 
 				return testutil.SetupBadValidationConduit(t)
@@ -191,10 +180,11 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			is := is.New(t)
-			v := ConduitCustomValidator{conduit.NewValidator(log.Log.WithName("webhook-validation"))}
-			conduit := tc.setup()
+			ctx := context.Background()
+			c := tc.setup()
+			v := ConduitCustomValidator{conduit.NewValidator(ctx, log.Log.WithName("webhook-validation"))}
 
-			_, err := v.ValidateUpdate(context.Background(), runtime.Object(nil), runtime.Object(conduit))
+			_, err := v.ValidateUpdate(context.Background(), runtime.Object(nil), runtime.Object(c))
 
 			if tc.wantErr != nil {
 				is.True(err != nil)
@@ -204,39 +194,4 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			}
 		})
 	}
-}
-
-func setupHTTPMockClient(t *testing.T) *mock.MockhttpClient {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockClient := mock.NewMockhttpClient(ctrl)
-	conduit.HTTPClient = mockClient
-
-	return mockClient
-}
-
-//nolint:bodyclose // Body is closed in the validator, bodyclose is not recognizing this.
-func getHTTPResps() []func(*http.Request) (*http.Response, error) {
-	var resps []func(*http.Request) (*http.Response, error)
-
-	respFn := func(_ *http.Request) (*http.Response, error) {
-		resp := &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString("{\"tag_name\": \"v0.10.1\"}")),
-		}
-		return resp, nil
-	}
-	resps = append(resps, respFn)
-
-	respFn = func(_ *http.Request) (*http.Response, error) {
-		resp := &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(strings.NewReader(connectorYAML)),
-		}
-		return resp, nil
-	}
-	resps = append(resps, respFn)
-
-	return resps
 }
