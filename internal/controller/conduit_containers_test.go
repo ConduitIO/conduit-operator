@@ -205,6 +205,7 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 			"--db.sqlite.path", "/conduit.storage/db",
 			"--pipelines.exit-on-degraded",
 			"--processors.path", "/conduit.storage/processors",
+			"--log.format", "json",
 		},
 		Ports: []corev1.ContainerPort{
 			{
