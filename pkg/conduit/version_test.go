@@ -25,6 +25,7 @@ func Test_ForVersion(t *testing.T) {
 				"-db.sqlite.path", "/conduit.storage/db",
 				"-pipelines.exit-on-error",
 				"-processors.path", "/conduit.storage/processors",
+				"-log.format", "json",
 			},
 		},
 		{
@@ -37,6 +38,7 @@ func Test_ForVersion(t *testing.T) {
 				"--db.sqlite.path", "/conduit.storage/db",
 				"--pipelines.exit-on-degraded",
 				"--processors.path", "/conduit.storage/processors",
+				"--log.format", "json",
 			},
 		},
 		{
@@ -49,6 +51,7 @@ func Test_ForVersion(t *testing.T) {
 				"--db.sqlite.path", "/conduit.storage/db",
 				"--pipelines.exit-on-degraded",
 				"--processors.path", "/conduit.storage/processors",
+				"--log.format", "json",
 			},
 		},
 		{
@@ -62,6 +65,7 @@ func Test_ForVersion(t *testing.T) {
 				"--db.sqlite.path", "/conduit.storage/db",
 				"--pipelines.exit-on-degraded",
 				"--processors.path", "/conduit.storage/processors",
+				"--log.format", "json",
 			},
 		},
 		{

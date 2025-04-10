@@ -63,6 +63,7 @@ func (f *Flags) v011() []string {
 		"-db.sqlite.path", f.args.DBPath,
 		"-pipelines.exit-on-error",
 		"-processors.path", f.args.ProcessorsPath,
+		"-log.format", "json",
 	}
 }
 
@@ -74,6 +75,7 @@ func (f *Flags) v012() []string {
 		"--db.sqlite.path", f.args.DBPath,
 		"--pipelines.exit-on-degraded",
 		"--processors.path", f.args.ProcessorsPath,
+		"--log.format", "json",
 	}
 }
 
@@ -86,6 +88,7 @@ func (f *Flags) v013() []string {
 		"--db.sqlite.path", f.args.DBPath,
 		"--pipelines.exit-on-degraded",
 		"--processors.path", f.args.ProcessorsPath,
+		"--log.format", "json",
 	}
 }
 
