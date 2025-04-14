@@ -28,7 +28,7 @@ func NewFlags(fns ...func(*Args)) *Flags {
 
 func (f *Flags) ForVersion(ver string) ([]string, error) {
 	constraints := map[string]string{
-		"v011": "~0.11.1",
+		"v011": "~0.11.x",
 		"v012": "~0.12.x",
 		"v013": "~0.13.x",
 	}

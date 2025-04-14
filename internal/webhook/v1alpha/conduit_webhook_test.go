@@ -24,8 +24,7 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 	}{
 		{ver: "v0.13.2", expectedErr: nil},
 		{ver: "v1", expectedErr: nil},
-		{ver: "v0.11.1", expectedErr: fmt.Errorf(`spec.version: Invalid value: "v0.11.1": unsupported conduit version "v0.11.1", minimum required "v0.13.2"`)},
-		{ver: "v0.12", expectedErr: fmt.Errorf(`spec.version: Invalid value: "v0.12": unsupported conduit version "v0.12", minimum required "v0.13.2"`)},
+		{ver: "v0.10.2", expectedErr: fmt.Errorf(`spec.version: Invalid value: "v0.10.2": unsupported conduit version "v0.10.2", minimum required "v0.11.0"`)},
 	}
 
 	testname := func(err error, ver string) string {
