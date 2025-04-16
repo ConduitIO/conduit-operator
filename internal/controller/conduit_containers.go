@@ -131,13 +131,7 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 }
 
 // ConduitRuntimeContainer returns a Kubernetes container definition
-func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar) (corev1.Container, error) {
-	flags := conduit.NewFlags(
-		conduit.WithPipelineFile(v1alpha.ConduitPipelineFile),
-		conduit.WithConnectorsPath(v1alpha.ConduitConnectorsPath),
-		conduit.WithDBPath(v1alpha.ConduitDBPath),
-		conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
-	)
+func ConduitRuntimeContainer(image, version string, envVars []corev1.EnvVar, flags *conduit.Flags) (corev1.Container, error) {
 	args, err := flags.ForVersion(version)
 	if err != nil {
 		return corev1.Container{}, err

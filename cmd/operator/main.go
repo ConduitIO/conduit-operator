@@ -179,6 +179,15 @@ func main() {
 		})
 	}
 
+	meta, err := readMetadata(metadataFile)
+	if err != nil {
+		fatal(err, "failed to load conduit instance metadata", "file", metadataFile)
+	}
+
+	if opts.Development {
+		meta.LogFormat = v1alpha.ConduitLogFormatText
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                        scheme,
 		Metrics:                       metricsServerOptions,
@@ -197,17 +206,12 @@ func main() {
 		fatal(err, "unable to create webhook", "webhook", "Conduit")
 	}
 
-	meta, err := readMetadata(metadataFile)
-	if err != nil {
-		fatal(err, "failed to load conduit instance metadata", "file", metadataFile)
-	}
-
-	if err := (&controller.ConduitReconciler{
-		Metadata:      meta,
-		Client:        mgr.GetClient(),
-		Logger:        ctrl.Log.WithName("controller").WithName("conduit"),
-		EventRecorder: mgr.GetEventRecorderFor("conduit-controller"),
-	}).SetupWithManager(mgr); err != nil {
+	if err := controller.NewConduitReconciler(
+		meta,
+		mgr.GetClient(),
+		ctrl.Log.WithName("controller").WithName("conduit"),
+		mgr.GetEventRecorderFor("conduit-controller"),
+	).SetupWithManager(mgr); err != nil {
 		fatal(err, "unable to create controller", "controller", "Conduit")
 	}
 
@@ -249,16 +253,13 @@ func fatal(err error, msg string, kv ...any) {
 
 // readMetadata loads label, selector and annotion data from a file.
 func readMetadata(file string) (*v1alpha.ConduitInstanceMetadata, error) {
-	c := v1alpha.ConduitInstanceMetadata{
-		PodAnnotations: make(map[string]string),
-		Labels:         make(map[string]string),
-	}
+	c := v1alpha.NewConduitInstanceMetadata()
 
 	_, err := os.Stat(file)
 	switch {
 	case os.IsNotExist(err):
 		setupLog.Info("conduit instance metadata file missing, skipping.")
-		return &c, nil
+		return c, nil
 	case err != nil:
 		return nil, err
 	}
@@ -268,12 +269,12 @@ func readMetadata(file string) (*v1alpha.ConduitInstanceMetadata, error) {
 		return nil, err
 	}
 
-	if err := yaml.Unmarshal(data, &c); err != nil {
+	if err := yaml.Unmarshal(data, c); err != nil {
 		return nil, err
 	}
 
 	setupLog.Info("conduit instance metadata loaded.")
-	return &c, nil
+	return c, nil
 }
 
 // Changes the encoder time stamp key from the degault `ts` to `timestamp`

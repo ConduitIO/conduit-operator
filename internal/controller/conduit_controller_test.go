@@ -904,11 +904,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.PendingReason, gomock.Any(), nn, gomock.Any())
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.CreatedReason, gomock.Any(), nn)
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 		},
 		{
@@ -968,11 +964,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.RunningReason, gomock.Any(), nn, gomock.Any())
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 		},
 		{
@@ -1032,11 +1024,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.PendingReason, gomock.Any(), nn)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 		},
 		{
@@ -1093,11 +1081,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.StoppedReason, gomock.Any(), nn)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 		},
 		{
@@ -1156,11 +1140,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.DegradedReason, gomock.Any(), nn)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.UpdatedReason, gomock.Any(), nn)
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 		},
 		{
@@ -1182,11 +1162,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 			wantErr: errors.New("Internal error occurred: boom"),
 		},
@@ -1210,11 +1186,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder := mock.NewMockEventRecorder(ctrl)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 			wantErr: errors.New("Internal error occurred: boom"),
 		},
@@ -1258,11 +1230,7 @@ func Test_CreateOrUpdateDeployment(t *testing.T) {
 				recorder.EXPECT().Eventf(c, corev1.EventTypeWarning, v1alpha.ErroredReason, gomock.Any(), nn, errInternal)
 				recorder.EXPECT().Eventf(c, corev1.EventTypeNormal, v1alpha.PendingReason, gomock.Any(), nn, gomock.Any())
 
-				return &ConduitReconciler{
-					Metadata:      &v1alpha.ConduitInstanceMetadata{},
-					Client:        client,
-					EventRecorder: recorder,
-				}
+				return NewConduitReconciler(&v1alpha.ConduitInstanceMetadata{}, client, logr.NewTestLogger(t), recorder)
 			},
 			wantErr: errors.New("Internal error occurred: boom"),
 		},

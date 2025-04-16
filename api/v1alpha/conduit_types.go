@@ -54,6 +54,8 @@ const (
 	ConduitPipelineVolumeMount = "conduit-pipelines"
 	ConduitInitImage           = "golang:1.23-alpine"
 	ConduitInitContainerName   = "conduit-init"
+	ConduitLogFormatJSON       = "json"
+	ConduitLogFormatText       = "cli"
 )
 
 var (
@@ -172,11 +174,21 @@ type ConduitList struct {
 	Items           []Conduit `json:"items"`
 }
 
+// Returns new conduit instance metadata struct with defaults
+func NewConduitInstanceMetadata() *ConduitInstanceMetadata {
+	return &ConduitInstanceMetadata{
+		PodAnnotations: make(map[string]string),
+		Labels:         make(map[string]string),
+		LogFormat:      ConduitLogFormatJSON,
+	}
+}
+
 // +k8s:deepcopy-gen=false
 // ConduitInstanceConfig contains metadata which will be passed to each conduit deployment
 type ConduitInstanceMetadata struct {
 	PodAnnotations map[string]string `yaml:"podAnnotations"`
 	Labels         map[string]string `yaml:"labels"`
+	LogFormat      string            `yaml:"logFormat"`
 }
 
 func init() {

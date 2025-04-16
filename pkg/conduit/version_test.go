@@ -88,6 +88,7 @@ func Test_ForVersion(t *testing.T) {
 				WithConnectorsPath(v1alpha.ConduitConnectorsPath),
 				WithDBPath(v1alpha.ConduitDBPath),
 				WithProcessorsPath(v1alpha.ConduitProcessorsPath),
+				WithLogFormat(v1alpha.ConduitLogFormatJSON),
 			)
 			args, err := flags.ForVersion(tc.version)
 			if err != nil {
