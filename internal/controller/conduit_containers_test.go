@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit-operator/pkg/conduit"
 )
 
 func Test_ConduitInitContainers(t *testing.T) {
@@ -192,6 +193,14 @@ func Test_ConduitInitContainers(t *testing.T) {
 }
 
 func Test_ConduitRuntimeContainer(t *testing.T) {
+	flags := conduit.NewFlags(
+		conduit.WithPipelineFile(v1alpha.ConduitPipelineFile),
+		conduit.WithConnectorsPath(v1alpha.ConduitConnectorsPath),
+		conduit.WithDBPath(v1alpha.ConduitDBPath),
+		conduit.WithProcessorsPath(v1alpha.ConduitProcessorsPath),
+		conduit.WithLogFormat(v1alpha.ConduitLogFormatJSON),
+	)
+
 	runtimeContainer := corev1.Container{
 		Name:            "conduit-server",
 		Image:           "my-image:v0.13.2",
@@ -294,6 +303,7 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 						Value: "val-2",
 					},
 				},
+				flags,
 			)
 			if err != nil {
 				is.Equal(tc.wantErr.Error(), err.Error())

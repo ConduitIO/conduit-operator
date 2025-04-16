@@ -31,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	internalconduit "github.com/conduitio/conduit-operator/pkg/conduit"
 )
 
 // Log levels
@@ -41,11 +43,35 @@ const (
 
 // ConduitReconciler reconciles a Conduit object
 type ConduitReconciler struct {
-	Metadata *v1.ConduitInstanceMetadata
-
 	client.Client
 	logr.Logger
 	record.EventRecorder
+
+	meta  *v1.ConduitInstanceMetadata
+	flags *internalconduit.Flags
+}
+
+func NewConduitReconciler(
+	meta *v1.ConduitInstanceMetadata,
+	c client.Client,
+	logger logr.Logger,
+	recorder record.EventRecorder,
+) *ConduitReconciler {
+	flags := internalconduit.NewFlags(
+		internalconduit.WithPipelineFile(v1.ConduitPipelineFile),
+		internalconduit.WithConnectorsPath(v1.ConduitConnectorsPath),
+		internalconduit.WithDBPath(v1.ConduitDBPath),
+		internalconduit.WithProcessorsPath(v1.ConduitProcessorsPath),
+		internalconduit.WithLogFormat(meta.LogFormat),
+	)
+
+	return &ConduitReconciler{
+		Client:        c,
+		Logger:        logger,
+		EventRecorder: recorder,
+		flags:         flags,
+		meta:          meta,
+	}
 }
 
 //+kubebuilder:rbac:groups=operator.conduit.io,resources=conduits,verbs=get;list;watch;create;update;patch;delete
@@ -324,8 +350,8 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 	annotations["operator.conduit.io/config-map-version"] = cm.ResourceVersion
 
 	// merge instance metadata
-	maps.Copy(labels, r.Metadata.Labels)
-	maps.Copy(annotations, r.Metadata.PodAnnotations)
+	maps.Copy(labels, r.meta.Labels)
+	maps.Copy(annotations, r.meta.PodAnnotations)
 
 	merge := func(current, updated *appsv1.DeploymentSpec) error {
 		v, err := json.Marshal(updated)
@@ -345,7 +371,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 			})
 		}
 
-		container, err := ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, envVars)
+		container, err := ConduitRuntimeContainer(c.Spec.Image, c.Spec.Version, envVars, r.flags)
 		if err != nil {
 			return err
 		}

@@ -16,6 +16,7 @@ type Args struct {
 	ConnectorsPath string
 	DBPath         string
 	ProcessorsPath string
+	LogFormat      string
 }
 
 func NewFlags(fns ...func(*Args)) *Flags {
@@ -63,7 +64,7 @@ func (f *Flags) v011() []string {
 		"-db.sqlite.path", f.args.DBPath,
 		"-pipelines.exit-on-error",
 		"-processors.path", f.args.ProcessorsPath,
-		"-log.format", "json",
+		"-log.format", f.args.LogFormat,
 	}
 }
 
@@ -76,7 +77,7 @@ func (f *Flags) v012() []string {
 		"--pipelines.exit-on-degraded",
 		"--pipelines.error-recovery.max-retries", "0",
 		"--processors.path", f.args.ProcessorsPath,
-		"--log.format", "json",
+		"--log.format", f.args.LogFormat,
 	}
 }
 
@@ -90,7 +91,7 @@ func (f *Flags) v013() []string {
 		"--pipelines.exit-on-degraded",
 		"--pipelines.error-recovery.max-retries", "0",
 		"--processors.path", f.args.ProcessorsPath,
-		"--log.format", "json",
+		"--log.format", f.args.LogFormat,
 	}
 }
 
@@ -115,5 +116,11 @@ func WithDBPath(path string) func(*Args) {
 func WithProcessorsPath(path string) func(*Args) {
 	return func(a *Args) {
 		a.ProcessorsPath = path
+	}
+}
+
+func WithLogFormat(format string) func(*Args) {
+	return func(a *Args) {
+		a.LogFormat = format
 	}
 }
