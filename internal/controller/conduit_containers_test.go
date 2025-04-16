@@ -204,6 +204,7 @@ func Test_ConduitRuntimeContainer(t *testing.T) {
 			"--db.type", "sqlite",
 			"--db.sqlite.path", "/conduit.storage/db",
 			"--pipelines.exit-on-degraded",
+			"--pipelines.error-recovery.max-retries", "0",
 			"--processors.path", "/conduit.storage/processors",
 			"--log.format", "json",
 		},
