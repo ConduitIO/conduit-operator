@@ -74,6 +74,7 @@ func (f *Flags) v012() []string {
 		"--db.type", "sqlite",
 		"--db.sqlite.path", f.args.DBPath,
 		"--pipelines.exit-on-degraded",
+		"--pipelines.error-recovery.max-retries", "0",
 		"--processors.path", f.args.ProcessorsPath,
 		"--log.format", "json",
 	}
@@ -87,6 +88,7 @@ func (f *Flags) v013() []string {
 		"--db.type", "sqlite",
 		"--db.sqlite.path", f.args.DBPath,
 		"--pipelines.exit-on-degraded",
+		"--pipelines.error-recovery.max-retries", "0",
 		"--processors.path", f.args.ProcessorsPath,
 		"--log.format", "json",
 	}

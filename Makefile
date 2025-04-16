@@ -120,7 +120,7 @@ kind_setup: kind_cluster
 .PHONY: kind_image_build
 kind_image_build: docker_build
 	@sleep 2 # this is required to allow for docker deskop on mac to settle with the image
-	kind load docker-image $(IMG) -n $(KIND_CLUSTER)
+	kind load -v1 docker-image $(IMG) -n $(KIND_CLUSTER)
 
 .PHONY: dev_delete
 dev_delete:
