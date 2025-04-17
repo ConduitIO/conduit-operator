@@ -320,10 +320,15 @@ func (r *ConduitReconciler) CreateOrUpdateVolume(ctx context.Context, c *v1.Cond
 // Status conditions are set depending on the outcome of the operation.
 func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.Conduit) error {
 	var (
-		cm       = corev1.ConfigMap{}
-		secret   = corev1.Secret{}
-		nn       = c.NamespacedName()
-		replicas = r.getReplicas(c)
+		cm          = corev1.ConfigMap{}
+		secret      = corev1.Secret{}
+		nn          = c.NamespacedName()
+		replicas    = r.getReplicas(c)
+		labels      = make(map[string]string)
+		annotations = make(map[string]string)
+		matchLabels = map[string]string{
+			"app.kubernetes.io/name": nn.Name,
+		}
 
 		deployment = appsv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
@@ -331,11 +336,19 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 				Namespace: nn.Namespace,
 			},
 		}
-		labels = map[string]string{
-			"app.kubernetes.io/name": nn.Name,
-		}
-		annotations = make(map[string]string)
 	)
+
+	// precendence is given to:
+	// * metadata labels/annotations, then
+	// * resource labels/annotations, then
+	// * any system entries here.
+	maps.Copy(annotations, r.meta.PodAnnotations)
+	maps.Copy(annotations, c.Annotations)
+	maps.Copy(labels, r.meta.Labels)
+	maps.Copy(labels, c.Labels)
+
+	annotations["operator.conduit.io/config-map-version"] = cm.ResourceVersion
+	labels["app.kubernetes.io/name"] = nn.Name
 
 	if err := r.Get(ctx, nn, &cm); err != nil {
 		r.Eventf(c, corev1.EventTypeWarning, v1.ErroredReason, "Failed to get %q configmap: %s", nn, err)
@@ -346,12 +359,6 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		r.Eventf(c, corev1.EventTypeWarning, v1.ErroredReason, "Failed to get %q secret: %s", nn, err)
 		return err
 	}
-
-	annotations["operator.conduit.io/config-map-version"] = cm.ResourceVersion
-
-	// merge instance metadata
-	maps.Copy(labels, r.meta.Labels)
-	maps.Copy(annotations, r.meta.PodAnnotations)
 
 	merge := func(current, updated *appsv1.DeploymentSpec) error {
 		v, err := json.Marshal(updated)
@@ -405,7 +412,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		}
 
 		// Ensure labels and annotations are always exact.
-		deployment.Spec.Selector.MatchLabels = labels
+		deployment.Spec.Selector.MatchLabels = matchLabels
 		deployment.Spec.Template.ObjectMeta.Labels = labels
 		deployment.Spec.Template.ObjectMeta.Annotations = annotations
 
