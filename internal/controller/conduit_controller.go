@@ -338,7 +338,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 		}
 	)
 
-	// precendence is given to:
+	// precedence is given to:
 	// * metadata labels/annotations, then
 	// * resource labels/annotations, then
 	// * any system entries here.
