@@ -321,9 +321,10 @@ func (v *Validator) valueOrSecret(ctx context.Context, settings v1alpha.Settings
 		return "", fmt.Errorf("failed to get %q secret: %w", settings.SecretRef.Name, err)
 	}
 
-	if val, ok := secret.Data[settings.SecretRef.Key]; ok {
-		return string(val), nil
+	val, ok := secret.Data[settings.SecretRef.Key]
+	if !ok {
+		return "", fmt.Errorf("secret ref key %s does not exist", settings.SecretRef.Key)
 	}
 
-	return "", nil
+	return string(val), nil
 }
