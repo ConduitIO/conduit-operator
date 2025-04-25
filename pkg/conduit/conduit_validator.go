@@ -16,7 +16,9 @@ import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	pconfig "github.com/conduitio/conduit/pkg/provisioning/config"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -41,6 +43,7 @@ type PluginInfo struct {
 }
 
 type Validator struct {
+	Client        client.Client
 	Log           logr.Logger
 	ConnectorList map[string]PluginInfo
 }
@@ -56,7 +59,7 @@ type Releases struct {
 	Latest bool   `json:"is_latest"`
 }
 
-func NewValidator(ctx context.Context, log logr.Logger) *Validator {
+func NewValidator(ctx context.Context, cl client.Client, log logr.Logger) *Validator {
 	plugins, err := connectorList(ctx)
 	if err != nil {
 		log.Error(err, "unable to construct connector validation list %w")
@@ -64,6 +67,7 @@ func NewValidator(ctx context.Context, log logr.Logger) *Validator {
 	}
 
 	return &Validator{
+		Client:        cl,
 		Log:           log,
 		ConnectorList: plugins,
 	}
@@ -135,8 +139,13 @@ func (v *Validator) validateConnectorParameters(ctx context.Context, c *v1alpha.
 	}
 
 	settings := make(map[string]string)
-	for _, v := range c.Settings {
-		settings[v.Name] = v.Value
+	for _, setting := range c.Settings {
+		val, err := v.valueOrSecret(ctx, setting)
+		if err != nil {
+			v.Log.Error(err, "getting secret from client", "connector", c.Name, "setting", setting.Name)
+			return field.InternalError(fp.Child("parameter"), fmt.Errorf("getting secret from client %w", err))
+		}
+		settings[setting.Name] = val
 	}
 
 	config := config.Config(settings)
@@ -284,4 +293,27 @@ func (v *Validator) filterConnector(n string) (*PluginInfo, error) {
 	}
 
 	return nil, fmt.Errorf("no matching plugin found in cache")
+}
+
+func (v *Validator) valueOrSecret(ctx context.Context, settings v1alpha.SettingsVar) (string, error) {
+	if settings.SecretRef == nil {
+		return settings.Value, nil
+	}
+
+	var secret corev1.Secret
+	if err := v.Client.Get(
+		ctx,
+		client.ObjectKey{
+			Name: settings.SecretRef.Name,
+		},
+		&secret,
+	); err != nil {
+		return "", fmt.Errorf("failed to get %q secret: %w", settings.SecretRef.Name, err)
+	}
+
+	if val, ok := secret.Data[settings.SecretRef.Key]; ok {
+		return string(val), nil
+	}
+
+	return "", nil
 }

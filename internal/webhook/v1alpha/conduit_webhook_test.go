@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -38,7 +39,8 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 		t.Run(testname(tc.expectedErr, tc.ver), func(t *testing.T) {
 			is := is.New(t)
 			ctx := context.Background()
-			v := &ConduitCustomValidator{conduit.NewValidator(ctx, log.Log.WithName("webhook-validation"))}
+			cl := fake.NewClientBuilder().Build()
+			v := &ConduitCustomValidator{conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation"))}
 
 			fieldErr := v.validateConduitVersion(tc.ver)
 			if tc.expectedErr != nil {
@@ -109,7 +111,10 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			is := is.New(t)
 			ctx := context.Background()
 			c := tc.setup()
-			v := ConduitCustomValidator{conduit.NewValidator(ctx, log.Log.WithName("webhook-validation"))}
+			cl := fake.NewClientBuilder().Build()
+			v := ConduitCustomValidator{
+				conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation")),
+			}
 
 			_, err := v.ValidateCreate(context.Background(), runtime.Object(c))
 
@@ -181,7 +186,10 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			is := is.New(t)
 			ctx := context.Background()
 			c := tc.setup()
-			v := ConduitCustomValidator{conduit.NewValidator(ctx, log.Log.WithName("webhook-validation"))}
+			cl := fake.NewClientBuilder().Build()
+			v := ConduitCustomValidator{
+				conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation")),
+			}
 
 			_, err := v.ValidateUpdate(context.Background(), runtime.Object(nil), runtime.Object(c))
 

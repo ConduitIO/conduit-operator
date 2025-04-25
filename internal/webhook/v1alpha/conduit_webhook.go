@@ -53,7 +53,9 @@ func init() {
 // SetupConduitWebhookWithManager registers the webhook for Conduit in the manageconduit.
 func SetupConduitWebhookWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
-		WithValidator(&ConduitCustomValidator{validation.NewValidator(ctx, log.Log.WithName("webhook-validation"))}).
+		WithValidator(&ConduitCustomValidator{
+			validation.NewValidator(ctx, mgr.GetClient(), log.Log.WithName("webhook-validation")),
+		}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
 }
