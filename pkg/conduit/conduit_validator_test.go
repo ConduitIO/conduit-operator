@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -13,7 +14,12 @@ import (
 	"github.com/go-logr/logr/testr"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
+	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func TestValidator_ConnectorPlugin(t *testing.T) {
@@ -49,7 +55,8 @@ func TestValidator_ConnectorPlugin(t *testing.T) {
 			fp := field.NewPath("spec").Child("connectors")
 			logger := testr.New(t)
 			ctx := context.Background()
-			v := NewValidator(ctx, logger)
+			cl := fake.NewClientBuilder().Build()
+			v := NewValidator(ctx, cl, logger)
 
 			err := v.ValidateConnector(ctx, c.Spec.Connectors[0], fp)
 			if tc.wantErr != nil {
@@ -95,7 +102,8 @@ func TestValidator_ConnectorPluginType(t *testing.T) {
 			logger := testr.New(t)
 			fp := field.NewPath("spec").Child("connectors")
 			ctx := context.Background()
-			v := NewValidator(ctx, logger)
+			cl := fake.NewClientBuilder().Build()
+			v := NewValidator(ctx, cl, logger)
 
 			err := v.ValidateConnector(ctx, c.Spec.Connectors[0], fp)
 			if tc.wantErr != nil {
@@ -140,7 +148,8 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 			fp := field.NewPath("spec").Child("processors")
 			logger := testr.New(t)
 			ctx := context.Background()
-			v := NewValidator(ctx, logger)
+			cl := fake.NewClientBuilder().Build()
+			v := NewValidator(ctx, cl, logger)
 
 			err := v.ValidateProcessorPlugin(c.Spec.Processors[0], fp)
 			if tc.wantErr != nil {
@@ -160,6 +169,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 	tests := []struct {
 		name    string
 		setup   func() *v1alpha.ConduitConnector
+		client  func() client.Client
 		wantErr error
 	}{
 		{
@@ -177,6 +187,9 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 
 				return conduit.Spec.Connectors[0]
 			},
+			client: func() client.Client {
+				return fake.NewClientBuilder().Build()
+			},
 		},
 		{
 			name: "destination connector parameters are valid",
@@ -192,6 +205,9 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 				)
 
 				return conduit.Spec.Connectors[1]
+			},
+			client: func() client.Client {
+				return fake.NewClientBuilder().Build()
 			},
 		},
 		{
@@ -214,6 +230,9 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 
 				return conduit.Spec.Connectors[0]
 			},
+			client: func() client.Client {
+				return fake.NewClientBuilder().Build()
+			},
 			wantErr: nil,
 		},
 		{
@@ -231,6 +250,9 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 
 				return conduit.Spec.Connectors[0]
 			},
+			client: func() client.Client {
+				return fake.NewClientBuilder().Build()
+			},
 			wantErr: nil,
 		},
 		{
@@ -246,20 +268,119 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 
 				return conduit.Spec.Connectors[0]
 			},
+			client: func() client.Client {
+				return fake.NewClientBuilder().Build()
+			},
 			wantErr: nil,
+		},
+		{
+			name: "successfully decodes secret",
+			setup: func() *v1alpha.ConduitConnector {
+				conduit := testutil.SetupSecretConduit(t)
+
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				return conduit.Spec.Connectors[0]
+			},
+			client: func() client.Client {
+				secretUsername := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "objref1",
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{
+						"key1": []byte("secret-username"),
+					},
+				}
+
+				fakeClient := fake.NewClientBuilder().
+					WithObjects(secretUsername).
+					Build()
+
+				var clientObj client.Client = fakeClient
+
+				return clientObj
+			},
+		},
+		{
+			name: "secret does not exist",
+			setup: func() *v1alpha.ConduitConnector {
+				conduit := testutil.SetupSampleConduit(t)
+
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				return conduit.Spec.Connectors[0]
+			},
+			client: func() client.Client {
+				return fake.NewClientBuilder().Build()
+			},
+			wantErr: nil,
+		},
+		{
+			name: "secret lookup fails",
+			setup: func() *v1alpha.ConduitConnector {
+				conduit := testutil.SetupSecretConduit(t)
+
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				return conduit.Spec.Connectors[0]
+			},
+			client: func() client.Client {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "objref0",
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{
+						"key1": []byte("secret-value"),
+					},
+				}
+
+				fakeClient := fake.NewClientBuilder().
+					WithObjects(secret).
+					Build()
+
+				var clientObj client.Client = fakeClient
+
+				return clientObj
+			},
+			wantErr: field.InternalError(
+				field.NewPath("spec", "connectors", "parameter"),
+				fmt.Errorf("getting secrets for connector source-connector: %s ", "{ setting: saslUsername, err: failed to get \"objref1\" secret: secrets \"objref1\" not found}"),
+			),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(_ *testing.T) {
 			c := tc.setup()
+			cl := tc.client()
 			fp := field.NewPath("spec").Child("connectors")
 			logger := testr.New(t)
 			ctx := context.Background()
-			v := NewValidator(ctx, logger)
+			v := NewValidator(ctx, cl, logger)
 
 			err := v.ValidateConnector(ctx, c, fp)
 			if tc.wantErr != nil {
+				assert.NotNil(t, err)
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
 				is.Equal(err, nil)

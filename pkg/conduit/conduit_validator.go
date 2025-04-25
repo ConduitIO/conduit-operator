@@ -5,6 +5,7 @@ package conduit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,7 +17,9 @@ import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	pconfig "github.com/conduitio/conduit/pkg/provisioning/config"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -41,8 +44,9 @@ type PluginInfo struct {
 }
 
 type Validator struct {
-	Log           logr.Logger
-	ConnectorList map[string]PluginInfo
+	client        client.Client
+	log           logr.Logger
+	connectorList map[string]PluginInfo
 }
 
 type ConnectorInfo struct {
@@ -56,7 +60,7 @@ type Releases struct {
 	Latest bool   `json:"is_latest"`
 }
 
-func NewValidator(ctx context.Context, log logr.Logger) *Validator {
+func NewValidator(ctx context.Context, cl client.Client, log logr.Logger) *Validator {
 	plugins, err := connectorList(ctx)
 	if err != nil {
 		log.Error(err, "unable to construct connector validation list %w")
@@ -64,8 +68,9 @@ func NewValidator(ctx context.Context, log logr.Logger) *Validator {
 	}
 
 	return &Validator{
-		Log:           log,
-		ConnectorList: plugins,
+		client:        cl,
+		log:           log,
+		connectorList: plugins,
 	}
 }
 
@@ -113,30 +118,44 @@ func (v *Validator) validateConnectorParameters(ctx context.Context, c *v1alpha.
 	if !(c.Type == pconfig.TypeSource || c.Type == pconfig.TypeDestination) {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
-	if len(v.ConnectorList) == 0 {
-		v.Log.Info("connector list is empty, skipping parameter validation")
+	if len(v.connectorList) == 0 {
+		v.log.Info("connector list is empty, skipping parameter validation")
 		return nil
 	}
 
 	plugin, err := v.filterConnector(c.PluginName)
 	if err != nil {
-		v.Log.Error(err, "error filtering connector from list")
+		v.log.Error(err, "error filtering connector from list")
 		return nil
 	}
 	if plugin == nil {
-		v.Log.Error(err, fmt.Sprintf("connector %s not listed in cache", c.Name))
+		v.log.Error(err, fmt.Sprintf("connector %s not listed in cache", c.Name))
 		return nil
 	}
 
 	spec, err := v.fetchYAMLSpec(ctx, c, plugin)
 	if err != nil {
-		v.Log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
+		v.log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
 		return nil
 	}
 
 	settings := make(map[string]string)
-	for _, v := range c.Settings {
-		settings[v.Name] = v.Value
+	errs := make(map[string]error)
+	for _, setting := range c.Settings {
+		val, err := v.valueOrSecret(ctx, setting)
+		if err != nil {
+			errs[setting.Name] = err
+		}
+		settings[setting.Name] = val
+	}
+	// aggregate all settings errors into one
+	if len(errs) > 0 {
+		errMsg := fmt.Sprintf("getting secrets for connector %s: ", c.Name)
+		for setting, err := range errs {
+			errMsg += fmt.Sprintf("{ setting: %s, err: %s} ", setting, err)
+		}
+
+		return field.InternalError(fp.Child("parameter"), errors.New(errMsg))
 	}
 
 	config := config.Config(settings)
@@ -277,11 +296,35 @@ func (v *Validator) filterConnector(n string) (*PluginInfo, error) {
 		return nil, err
 	}
 
-	for _, p := range v.ConnectorList {
+	for _, p := range v.connectorList {
 		if strings.Contains(p.Name, pluginName) {
 			return &p, nil
 		}
 	}
 
 	return nil, fmt.Errorf("no matching plugin found in cache")
+}
+
+func (v *Validator) valueOrSecret(ctx context.Context, settings v1alpha.SettingsVar) (string, error) {
+	if settings.SecretRef == nil {
+		return settings.Value, nil
+	}
+
+	var secret corev1.Secret
+	if err := v.client.Get(
+		ctx,
+		client.ObjectKey{
+			Name: settings.SecretRef.Name,
+		},
+		&secret,
+	); err != nil {
+		return "", fmt.Errorf("failed to get %q secret: %w", settings.SecretRef.Name, err)
+	}
+
+	val, ok := secret.Data[settings.SecretRef.Key]
+	if !ok {
+		return "", fmt.Errorf("secret ref key %s does not exist", settings.SecretRef.Key)
+	}
+
+	return string(val), nil
 }
