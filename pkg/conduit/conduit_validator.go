@@ -5,6 +5,7 @@ package conduit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -139,13 +140,22 @@ func (v *Validator) validateConnectorParameters(ctx context.Context, c *v1alpha.
 	}
 
 	settings := make(map[string]string)
+	errs := make(map[string]error)
 	for _, setting := range c.Settings {
 		val, err := v.valueOrSecret(ctx, setting)
 		if err != nil {
-			v.log.Error(err, "getting secret from client", "connector", c.Name, "setting", setting.Name)
-			return field.InternalError(fp.Child("parameter"), fmt.Errorf("getting secret from client %w", err))
+			errs[setting.Name] = err
 		}
 		settings[setting.Name] = val
+	}
+	// aggregate all settings errors into one
+	if len(errs) > 0 {
+		errMsg := fmt.Sprintf("getting secrets for connector %s: ", c.Name)
+		for setting, err := range errs {
+			errMsg += fmt.Sprintf("{ setting: %s, err: %s} ", setting, err)
+		}
+
+		return field.InternalError(fp.Child("parameter"), errors.New(errMsg))
 	}
 
 	config := config.Config(settings)

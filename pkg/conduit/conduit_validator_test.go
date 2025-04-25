@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/go-logr/logr/testr"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -287,18 +289,18 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 				return conduit.Spec.Connectors[0]
 			},
 			client: func() client.Client {
-				secret := &corev1.Secret{
+				secretUsername := &corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "objref1",
 					},
 					Type: corev1.SecretTypeOpaque,
 					Data: map[string][]byte{
-						"key1": []byte("secret-value"),
+						"key1": []byte("secret-username"),
 					},
 				}
 
 				fakeClient := fake.NewClientBuilder().
-					WithObjects(secret).
+					WithObjects(secretUsername).
 					Build()
 
 				var clientObj client.Client = fakeClient
@@ -326,6 +328,45 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 			},
 			wantErr: nil,
 		},
+		{
+			name: "secret lookup fails",
+			setup: func() *v1alpha.ConduitConnector {
+				conduit := testutil.SetupSecretConduit(t)
+
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				return conduit.Spec.Connectors[0]
+			},
+			client: func() client.Client {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "objref0",
+					},
+					Type: corev1.SecretTypeOpaque,
+					Data: map[string][]byte{
+						"key1": []byte("secret-value"),
+					},
+				}
+
+				fakeClient := fake.NewClientBuilder().
+					WithObjects(secret).
+					Build()
+
+				var clientObj client.Client = fakeClient
+
+				return clientObj
+			},
+			wantErr: field.InternalError(
+				field.NewPath("spec", "connectors", "parameter"),
+				fmt.Errorf("getting secrets for connector source-connector: %s ", "{ setting: saslUsername, err: failed to get \"objref1\" secret: secrets \"objref1\" not found}"),
+			),
+		},
 	}
 
 	for _, tc := range tests {
@@ -339,6 +380,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 
 			err := v.ValidateConnector(ctx, c, fp)
 			if tc.wantErr != nil {
+				assert.NotNil(t, err)
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
 				is.Equal(err, nil)
