@@ -43,9 +43,9 @@ type PluginInfo struct {
 }
 
 type Validator struct {
-	Client        client.Client
-	Log           logr.Logger
-	ConnectorList map[string]PluginInfo
+	client        client.Client
+	log           logr.Logger
+	connectorList map[string]PluginInfo
 }
 
 type ConnectorInfo struct {
@@ -67,9 +67,9 @@ func NewValidator(ctx context.Context, cl client.Client, log logr.Logger) *Valid
 	}
 
 	return &Validator{
-		Client:        cl,
-		Log:           log,
-		ConnectorList: plugins,
+		client:        cl,
+		log:           log,
+		connectorList: plugins,
 	}
 }
 
@@ -117,24 +117,24 @@ func (v *Validator) validateConnectorParameters(ctx context.Context, c *v1alpha.
 	if !(c.Type == pconfig.TypeSource || c.Type == pconfig.TypeDestination) {
 		return field.InternalError(fp.Child("parameter"), fmt.Errorf("connector type %s is not recognized", c.Type))
 	}
-	if len(v.ConnectorList) == 0 {
-		v.Log.Info("connector list is empty, skipping parameter validation")
+	if len(v.connectorList) == 0 {
+		v.log.Info("connector list is empty, skipping parameter validation")
 		return nil
 	}
 
 	plugin, err := v.filterConnector(c.PluginName)
 	if err != nil {
-		v.Log.Error(err, "error filtering connector from list")
+		v.log.Error(err, "error filtering connector from list")
 		return nil
 	}
 	if plugin == nil {
-		v.Log.Error(err, fmt.Sprintf("connector %s not listed in cache", c.Name))
+		v.log.Error(err, fmt.Sprintf("connector %s not listed in cache", c.Name))
 		return nil
 	}
 
 	spec, err := v.fetchYAMLSpec(ctx, c, plugin)
 	if err != nil {
-		v.Log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
+		v.log.Error(err, fmt.Sprintf("getting plugin parameters for connector %s", c.Name))
 		return nil
 	}
 
@@ -142,7 +142,7 @@ func (v *Validator) validateConnectorParameters(ctx context.Context, c *v1alpha.
 	for _, setting := range c.Settings {
 		val, err := v.valueOrSecret(ctx, setting)
 		if err != nil {
-			v.Log.Error(err, "getting secret from client", "connector", c.Name, "setting", setting.Name)
+			v.log.Error(err, "getting secret from client", "connector", c.Name, "setting", setting.Name)
 			return field.InternalError(fp.Child("parameter"), fmt.Errorf("getting secret from client %w", err))
 		}
 		settings[setting.Name] = val
@@ -286,7 +286,7 @@ func (v *Validator) filterConnector(n string) (*PluginInfo, error) {
 		return nil, err
 	}
 
-	for _, p := range v.ConnectorList {
+	for _, p := range v.connectorList {
 		if strings.Contains(p.Name, pluginName) {
 			return &p, nil
 		}
@@ -301,7 +301,7 @@ func (v *Validator) valueOrSecret(ctx context.Context, settings v1alpha.Settings
 	}
 
 	var secret corev1.Secret
-	if err := v.Client.Get(
+	if err := v.client.Get(
 		ctx,
 		client.ObjectKey{
 			Name: settings.SecretRef.Name,
