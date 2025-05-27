@@ -491,9 +491,17 @@ func (r *ConduitReconciler) CreateOrUpdateService(ctx context.Context, c *v1.Con
 			{
 				Name:     "http",
 				Protocol: corev1.ProtocolTCP,
-				Port:     80,
+				Port:     8080,
 				TargetPort: intstr.IntOrString{
 					IntVal: 8080,
+				},
+			},
+			{
+				Name:     "grpc",
+				Protocol: corev1.ProtocolTCP,
+				Port:     8084,
+				TargetPort: intstr.IntOrString{
+					IntVal: 8084,
 				},
 			},
 		}
@@ -505,7 +513,7 @@ func (r *ConduitReconciler) CreateOrUpdateService(ctx context.Context, c *v1.Con
 			v1.ConditionConduitServiceReady,
 			corev1.ConditionTrue,
 			"ServiceReady",
-			fmt.Sprintf("Address http://%s:80", service.Spec.ClusterIP),
+			fmt.Sprintf("Address http://%[1]s:8080 grpc://%[1]s:8084", service.Spec.ClusterIP),
 		)
 		return ctrlutil.SetControllerReference(c, &service, r.Scheme())
 	}

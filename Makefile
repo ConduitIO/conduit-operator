@@ -10,7 +10,7 @@ CERT_MANAGER      := https://github.com/cert-manager/cert-manager/releases/downl
 KUSTOMIZE_VERSION ?= v5.5.0
 CTRL_GEN_VERSION  ?= v0.17.2
 KIND_VERSION      ?= v0.27.0
-GOLINT_VERSION    ?= v1.63.4
+GOLINT_VERSION    ?= v1.64.8
 
 .EXPORT_ALL_VARIABLES:
 
@@ -101,7 +101,7 @@ docker_push: docker_build
 
 ## Tooling for running the operator in a local kubernetes cluster
 
-bin/kind: 
+bin/kind:
 	GOBIN=$(PWD)/bin go install sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION)
 
 .PHONY: kind
