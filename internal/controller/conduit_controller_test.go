@@ -682,9 +682,17 @@ func Test_CreateOrUpdateService(t *testing.T) {
 						{
 							Name:     "http",
 							Protocol: corev1.ProtocolTCP,
-							Port:     80,
+							Port:     8080,
 							TargetPort: intstr.IntOrString{
 								IntVal: 8080,
+							},
+						},
+						{
+							Name:     "grpc",
+							Protocol: corev1.ProtocolTCP,
+							Port:     8084,
+							TargetPort: intstr.IntOrString{
+								IntVal: 8084,
 							},
 						},
 					},
@@ -733,9 +741,17 @@ func Test_CreateOrUpdateService(t *testing.T) {
 						{
 							Name:     "http",
 							Protocol: corev1.ProtocolTCP,
-							Port:     80,
+							Port:     8080,
 							TargetPort: intstr.IntOrString{
 								IntVal: 8080,
+							},
+						},
+						{
+							Name:     "grpc",
+							Protocol: corev1.ProtocolTCP,
+							Port:     8084,
+							TargetPort: intstr.IntOrString{
+								IntVal: 8084,
 							},
 						},
 					},
