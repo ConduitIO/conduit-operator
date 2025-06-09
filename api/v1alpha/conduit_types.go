@@ -94,6 +94,7 @@ type ConduitProcessor struct {
 	ID        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	Plugin    string `json:"plugin,omitempty"`
+	PluginURL string `json:"pluginURL,omitempty"`
 	Condition string `json:"condition,omitempty"`
 	Workers   int    `json:"workers,omitempty"`
 
