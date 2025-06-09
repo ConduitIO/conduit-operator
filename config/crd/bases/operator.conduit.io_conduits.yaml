@@ -65,6 +65,8 @@ spec:
                             type: string
                           plugin:
                             type: string
+                          pluginURL:
+                            type: string
                           settings:
                             items:
                               properties:
@@ -176,6 +178,8 @@ spec:
                     name:
                       type: string
                     plugin:
+                      type: string
+                    pluginURL:
                       type: string
                     settings:
                       items:
