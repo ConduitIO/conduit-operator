@@ -249,6 +249,10 @@ func (v *ConduitCustomValidator) validateProcessors(pp []*v1alpha.ConduitProcess
 	for _, p := range pp {
 		if err := v.ValidateProcessorPlugin(p, fp); err != nil {
 			errs = append(errs, err)
+			continue
+		}
+		if err := v.ValidateProcessorSchema(p, fp); err != nil {
+			errs = append(errs, err)
 		}
 	}
 

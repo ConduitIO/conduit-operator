@@ -15,8 +15,12 @@ import (
 	"github.com/conduitio/conduit-commons/config"
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	conduitLog "github.com/conduitio/conduit/pkg/foundation/log"
+	"github.com/conduitio/conduit/pkg/plugin/processor/procutils"
+	"github.com/conduitio/conduit/pkg/plugin/processor/standalone"
 	pconfig "github.com/conduitio/conduit/pkg/provisioning/config"
 	"github.com/go-logr/logr"
+	"github.com/rs/zerolog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -97,6 +101,37 @@ func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *fie
 	if p.Plugin == "" {
 		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
+	return nil
+}
+
+func (v *Validator) ValidateProcessorSchema(ctx context.Context, p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+	// TODO if not a builtin processor, make sure the url exists
+
+	processorURL := ""
+	// will be getting an incoming URL to pull from pocketbase with the incoming standalone processor
+	// url is passed in, call to pocketbase to get processor file
+	proc, err := pluginWASM(ctx, processorURL)
+	if err != nil {
+		// TODO how do I want to handle this error
+		return nil
+	}
+	// OR dont get from url, check from file system
+
+	conduitLogger := conduitLog.InitLogger(zerolog.DebugLevel, conduitLog.FormatJSON)
+
+	procSchemaService := procutils.NewSchemaService(conduitLogger, h.schemaRegistry)
+	reg, err := standalone.NewRegistry(conduitLogger, "/tmp", procSchemaService)
+	if err != nil {
+		return field.InternalError(fp.Child("schema"), fmt.Errorf("failed to create standalone registry: %w", err))
+	}
+
+	dst := "filepath"
+	name, err := reg.Register(ctx, dst)
+	if err != nil {
+		// TODO handle error
+		return nil
+	}
+
 	return nil
 }
 
@@ -230,6 +265,37 @@ func formatPluginName(pn string) (string, error) {
 	return "", nil
 }
 
+func pluginWASM(ctx context.Context, processorURL string) (*v1alpha.ConduitProcessor, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, processorURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("non-sucessful status code while getting processor WASM, status code: %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var processors []*v1alpha.ConduitProcessor
+	err = json.Unmarshal(body, &processors)
+	if err != nil {
+		return nil, err
+	}
+
+	proc := processors[0]
+
+	return proc, nil
+}
+
 // connectorList constructs a dictionary of connectors with information for
 // use by the validator. Skips any connectors with improper name formmatting or
 // are not in allowed orgs.
@@ -244,7 +310,7 @@ func connectorList(ctx context.Context) (map[string]PluginInfo, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, err // TODO need to fix this to bad status code
 	}
 	defer resp.Body.Close()
 
