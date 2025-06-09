@@ -2,6 +2,7 @@ package conduit
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
@@ -29,9 +30,10 @@ func NewFlags(fns ...func(*Args)) *Flags {
 
 func (f *Flags) ForVersion(ver string) ([]string, error) {
 	constraints := map[string]string{
-		"v011": "~0.11.x",
-		"v012": "~0.12.x",
-		"v013": "~0.13.x",
+		"v011":    "~0.11.x",
+		"v012":    "~0.12.x",
+		"v013.4":  "<= 0.13.4, >= 0.13.0",
+		"v013.5+": "^0.13.5",
 	}
 
 	sanitized, _ := strings.CutPrefix(ver, "v")
@@ -48,8 +50,10 @@ func (f *Flags) ForVersion(ver string) ([]string, error) {
 				return f.v011(), nil
 			case "v012":
 				return f.v012(), nil
-			case "v013":
-				return f.v013(), nil
+			case "v013.4":
+				return f.v013upto4(), nil
+			case "v013.5+":
+				return f.v0134plus(), nil
 			}
 		}
 	}
@@ -81,10 +85,24 @@ func (f *Flags) v012() []string {
 	}
 }
 
-func (f *Flags) v013() []string {
+func (f *Flags) v013upto4() []string {
 	return []string{
 		"run",
 		"--pipelines.path", f.args.PipelineFile,
+		"--connectors.path", f.args.ConnectorsPath,
+		"--db.type", "sqlite",
+		"--db.sqlite.path", f.args.DBPath,
+		"--pipelines.exit-on-degraded",
+		"--pipelines.error-recovery.max-retries", "0",
+		"--processors.path", f.args.ProcessorsPath,
+		"--log.format", f.args.LogFormat,
+	}
+}
+
+func (f *Flags) v0134plus() []string {
+	return []string{
+		"run",
+		"--pipelines.path", filepath.Dir(f.args.PipelineFile),
 		"--connectors.path", f.args.ConnectorsPath,
 		"--db.type", "sqlite",
 		"--db.sqlite.path", f.args.DBPath,
