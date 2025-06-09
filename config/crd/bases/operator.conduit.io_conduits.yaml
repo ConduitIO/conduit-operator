@@ -65,7 +65,7 @@ spec:
                             type: string
                           plugin:
                             type: string
-                          pluginURL:
+                          processorURL:
                             type: string
                           settings:
                             items:
@@ -179,7 +179,7 @@ spec:
                       type: string
                     plugin:
                       type: string
-                    pluginURL:
+                    processorURL:
                       type: string
                     settings:
                       items:
