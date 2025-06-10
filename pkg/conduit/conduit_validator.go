@@ -107,17 +107,8 @@ func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *fie
 	return nil
 }
 
-func (v *Validator) ValidateProcessorParameters(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
-	// TODO if not a builtin processor, make sure the url exists
-
-	// check if processor is built in or standalone
-	// could check plugin against master list? -- dont have a master list of processors
-	// would need to create one - check conduit site generated files or against conduit itself
-	return nil
-}
-
 func (v *Validator) ValidateProcessorSchema(ctx context.Context, p *v1alpha.ConduitProcessor, sr schemaregistry.Registry, fp *field.Path) *field.Error {
-	processorURL := ""
+	processorURL := p.ProcessorURL
 	// will be getting an incoming URL to pull from pocketbase with the incoming standalone processor
 	// url is passed in, call to pocketbase to get processor file
 	file, err := pluginWASM(ctx, processorURL)
@@ -294,7 +285,7 @@ func pluginWASM(ctx context.Context, processorURL string) (string, error) {
 	// save as tmp file and use for upload
 	file, err := os.CreateTemp("", "proc-*.wasm")
 	if err != nil {
-		return "", err //TODO
+		return "", err // TODO
 	}
 	defer func() {
 		if err := os.Remove(file.Name()); err == nil {

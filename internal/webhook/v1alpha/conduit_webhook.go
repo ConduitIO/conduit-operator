@@ -184,7 +184,7 @@ func (v *ConduitCustomValidator) ValidateCreate(ctx context.Context, obj runtime
 		errs = append(errs, err)
 	}
 
-	sr, err := schemaRegistry(ctx, conduit.Spec.Registry, field.NewPath("schemaregistry"))
+	sr, err := schemaRegistry(conduit.Spec.Registry, field.NewPath("schemaregistry"))
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -216,7 +216,7 @@ func (v *ConduitCustomValidator) ValidateUpdate(ctx context.Context, _, newObj r
 		return nil, fmt.Errorf("expected a Conduit object for the newObj but got %T", newObj)
 	}
 
-	sr, err := schemaRegistry(ctx, conduit.Spec.Registry, field.NewPath("schemaregistry"))
+	sr, err := schemaRegistry(conduit.Spec.Registry, field.NewPath("schemaregistry"))
 	if err != nil {
 		return nil, fmt.Errorf("failed creating schema registry %w", err)
 	}
@@ -298,7 +298,7 @@ func (*ConduitCustomValidator) validateConduitVersion(ver string) *field.Error {
 	return nil
 }
 
-func schemaRegistry(ctx context.Context, reg *v1alpha.SchemaRegistry, fp *field.Path) (schemaregistry.Registry, *field.Error) {
+func schemaRegistry(reg *v1alpha.SchemaRegistry, fp *field.Path) (schemaregistry.Registry, *field.Error) {
 	cl, err := schemaregistry.NewClient(conduitlog.Nop(), sr.URLs(reg.URL))
 	if err != nil {
 		return nil, field.Invalid(fp, sr.URLs(reg.URL), fmt.Sprintf("failed to create schema registry: %s", err))
