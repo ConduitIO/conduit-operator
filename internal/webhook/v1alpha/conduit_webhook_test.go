@@ -206,20 +206,62 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["list"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["wasm"]),
 				)
 
 				return testutil.SetupSampleConduit(t)
 			},
 		},
 		{
-			name: "error occurs on http call",
+			name: "validates pipeline with source processors",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
-				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				return testutil.SetupSourceProcConduit(t)
+			},
+		},
+		{
+			name: "error occurs on http call in connector schema validation",
+			setup: func() *v1alpha.Conduit {
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
 
 				return testutil.SetupSampleConduit(t)
 			},
 			wantErr: nil,
+		},
+
+		{
+			name: "error occurs for processor schema",
+			setup: func() *v1alpha.Conduit {
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+				)
+
+				return testutil.SetupSampleConduit(t)
+			},
+			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
+				field.InternalError(
+					field.NewPath("spec", "processors", "schema"),
+					fmt.Errorf("failed to save wasm to file: BOOM"),
+				),
+			}),
 		},
 		{
 			name: "error occurs for processor schema",
@@ -243,7 +285,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			}),
 		},
 		{
-			name: "error occurs during validation",
+			name: "error occurs during connector param validation",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpFnResps := conduit.GetHTTPResps(t)

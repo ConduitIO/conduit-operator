@@ -224,7 +224,10 @@ func (v *ConduitCustomValidator) ValidateUpdate(ctx context.Context, _, newObj r
 	if errs := v.validateConnectors(ctx, conduit.Spec.Connectors, sr); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
 	}
-	// why dont we validate processors on update?
+
+	if errs := v.validateProcessors(ctx, conduit.Spec.Processors, sr, field.NewPath("spec").Child("processors")); len(errs) > 0 {
+		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
+	}
 
 	return nil, nil
 }
