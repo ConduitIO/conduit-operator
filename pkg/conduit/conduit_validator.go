@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 
@@ -19,6 +21,7 @@ import (
 	"github.com/conduitio/conduit/pkg/plugin/processor/procutils"
 	"github.com/conduitio/conduit/pkg/plugin/processor/standalone"
 	pconfig "github.com/conduitio/conduit/pkg/provisioning/config"
+	"github.com/conduitio/conduit/pkg/schemaregistry"
 	"github.com/go-logr/logr"
 	"github.com/rs/zerolog"
 	corev1 "k8s.io/api/core/v1"
@@ -104,29 +107,34 @@ func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *fie
 	return nil
 }
 
-func (v *Validator) ValidateProcessorSchema(ctx context.Context, p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+func (v *Validator) ValidateProcessorParameters(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
 	// TODO if not a builtin processor, make sure the url exists
 
+	// check if processor is built in or standalone
+	// could check plugin against master list? -- dont have a master list of processors
+	// would need to create one - check conduit site generated files or against conduit itself
+	return nil
+}
+
+func (v *Validator) ValidateProcessorSchema(ctx context.Context, p *v1alpha.ConduitProcessor, sr schemaregistry.Registry, fp *field.Path) *field.Error {
 	processorURL := ""
 	// will be getting an incoming URL to pull from pocketbase with the incoming standalone processor
 	// url is passed in, call to pocketbase to get processor file
-	proc, err := pluginWASM(ctx, processorURL)
+	file, err := pluginWASM(ctx, processorURL)
 	if err != nil {
 		// TODO how do I want to handle this error
 		return nil
 	}
-	// OR dont get from url, check from file system
 
 	conduitLogger := conduitLog.InitLogger(zerolog.DebugLevel, conduitLog.FormatJSON)
 
-	procSchemaService := procutils.NewSchemaService(conduitLogger, h.schemaRegistry)
+	procSchemaService := procutils.NewSchemaService(conduitLogger, sr)
 	reg, err := standalone.NewRegistry(conduitLogger, "/tmp", procSchemaService)
 	if err != nil {
 		return field.InternalError(fp.Child("schema"), fmt.Errorf("failed to create standalone registry: %w", err))
 	}
 
-	dst := "filepath"
-	name, err := reg.Register(ctx, dst)
+	_, err = reg.Register(ctx, file)
 	if err != nil {
 		// TODO handle error
 		return nil
@@ -244,7 +252,7 @@ func (v *Validator) fetchYAMLSpec(ctx context.Context, c *v1alpha.ConduitConnect
 
 // formatPluginName converts the plugin name into the format
 // "conduit-connector-connectorName"
-// Returns the github organization and the transformed connector name
+// Returns the transformed connector name
 func formatPluginName(pn string) (string, error) {
 	parts := strings.Split(strings.TrimPrefix(strings.ToLower(pn), "github.com/"), "/")
 
@@ -265,35 +273,41 @@ func formatPluginName(pn string) (string, error) {
 	return "", nil
 }
 
-func pluginWASM(ctx context.Context, processorURL string) (*v1alpha.ConduitProcessor, error) {
+// pluginWASM gets the processor WASM from the specified URL and saves to a temp
+// file.
+// Returns the filename of the created file
+func pluginWASM(ctx context.Context, processorURL string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, processorURL, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("non-sucessful status code while getting processor WASM, status code: %d", resp.StatusCode)
+		return "", fmt.Errorf("non-sucessful status code while getting processor WASM, status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	// save as tmp file and use for upload
+	file, err := os.CreateTemp("", "proc-*.wasm")
 	if err != nil {
-		return nil, err
+		return "", err //TODO
+	}
+	defer func() {
+		if err := os.Remove(file.Name()); err == nil {
+			log.Println(err)
+		} // clean up temp file
+		file.Close()
+	}()
+
+	if _, err = io.Copy(file, resp.Body); err != nil {
+		return "", err
 	}
 
-	var processors []*v1alpha.ConduitProcessor
-	err = json.Unmarshal(body, &processors)
-	if err != nil {
-		return nil, err
-	}
-
-	proc := processors[0]
-
-	return proc, nil
+	return file.Name(), nil
 }
 
 // connectorList constructs a dictionary of connectors with information for
