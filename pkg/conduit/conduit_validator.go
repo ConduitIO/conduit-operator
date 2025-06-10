@@ -108,17 +108,17 @@ func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *fie
 }
 
 func (v *Validator) ValidateProcessorSchema(ctx context.Context, p *v1alpha.ConduitProcessor, sr schemaregistry.Registry, fp *field.Path) *field.Error {
-	processorURL := p.ProcessorURL
 	// will be getting an incoming URL to pull from pocketbase with the incoming standalone processor
 	// url is passed in, call to pocketbase to get processor file
-	file, err := pluginWASM(ctx, processorURL)
+	file, cleanup, err := pluginWASM(ctx, p.ProcessorURL)
 	if err != nil {
-		// TODO how do I want to handle this error
-		return nil
+		return field.InternalError(fp.Child("schema"), fmt.Errorf("failed to save wasm to file: %w", err))
+	}
+	if cleanup != nil {
+		defer cleanup()
 	}
 
 	conduitLogger := conduitLog.InitLogger(zerolog.DebugLevel, conduitLog.FormatJSON)
-
 	procSchemaService := procutils.NewSchemaService(conduitLogger, sr)
 	reg, err := standalone.NewRegistry(conduitLogger, "/tmp", procSchemaService)
 	if err != nil {
@@ -127,8 +127,7 @@ func (v *Validator) ValidateProcessorSchema(ctx context.Context, p *v1alpha.Cond
 
 	_, err = reg.Register(ctx, file)
 	if err != nil {
-		// TODO handle error
-		return nil
+		return field.InternalError(fp.Child("schema"), fmt.Errorf("failed to register: %w", err))
 	}
 
 	return nil
@@ -266,39 +265,38 @@ func formatPluginName(pn string) (string, error) {
 
 // pluginWASM gets the processor WASM from the specified URL and saves to a temp
 // file.
-// Returns the filename of the created file
-func pluginWASM(ctx context.Context, processorURL string) (string, error) {
+// Returns the filename of the created file and a cleanup function fo the file
+func pluginWASM(ctx context.Context, processorURL string) (string, func(), error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, processorURL, nil)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("non-sucessful status code while getting processor WASM, status code: %d", resp.StatusCode)
+		return "", nil, fmt.Errorf("non-sucessful status code while getting processor WASM, status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 
 	// save as tmp file and use for upload
 	file, err := os.CreateTemp("", "proc-*.wasm")
 	if err != nil {
-		return "", err // TODO
+		return "", nil, err
 	}
-	defer func() {
-		if err := os.Remove(file.Name()); err == nil {
-			log.Println(err)
-		} // clean up temp file
-		file.Close()
-	}()
 
 	if _, err = io.Copy(file, resp.Body); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	return file.Name(), nil
+	return file.Name(), func() {
+		if err := os.Remove(file.Name()); err != nil {
+			log.Println(err)
+		}
+		file.Close()
+	}, nil
 }
 
 // connectorList constructs a dictionary of connectors with information for
@@ -315,7 +313,7 @@ func connectorList(ctx context.Context) (map[string]PluginInfo, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, err // TODO need to fix this to bad status code
+		return nil, fmt.Errorf("getting connector list, status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 

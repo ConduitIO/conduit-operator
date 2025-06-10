@@ -224,6 +224,7 @@ func (v *ConduitCustomValidator) ValidateUpdate(ctx context.Context, _, newObj r
 	if errs := v.validateConnectors(ctx, conduit.Spec.Connectors, sr); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
 	}
+	// why dont we validate processors on update?
 
 	return nil, nil
 }
@@ -299,6 +300,11 @@ func (*ConduitCustomValidator) validateConduitVersion(ver string) *field.Error {
 }
 
 func schemaRegistry(reg *v1alpha.SchemaRegistry, fp *field.Path) (schemaregistry.Registry, *field.Error) {
+	if reg == nil || reg.URL == "" {
+		// TO TEST: is registry normally set?
+		return nil, field.InternalError(fp, fmt.Errorf("registry must be set"))
+	}
+
 	cl, err := schemaregistry.NewClient(conduitlog.Nop(), sr.URLs(reg.URL))
 	if err != nil {
 		return nil, field.Invalid(fp, sr.URLs(reg.URL), fmt.Sprintf("failed to create schema registry: %s", err))
