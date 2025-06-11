@@ -18,16 +18,15 @@ const (
 	builderTempPath = "/tmp/connectors"
 )
 
-type connectorCommandBuilder struct {
-	sync.Mutex
-	done   map[string]bool
-	builds []connectorBuild // ordered
+type Buildable interface {
+	steps() []string
+	key() string
 }
 
-type processorCommandBuilder struct {
+type commandBuilder[T Buildable] struct {
 	sync.Mutex
 	done   map[string]bool
-	builds []processorBuild // ordered
+	builds []T // ordered
 }
 
 type connectorBuild struct {
@@ -38,13 +37,7 @@ type connectorBuild struct {
 	ldflags   string
 }
 
-type processorBuild struct {
-	targetDir string
-	procUrl   string
-	name      string
-}
-
-func (cb *connectorBuild) steps() []string {
+func (cb connectorBuild) steps() []string {
 	return []string{
 		fmt.Sprint("mkdir -p ", cb.tmpDir, " ", cb.targetDir),
 		fmt.Sprint(
@@ -57,78 +50,61 @@ func (cb *connectorBuild) steps() []string {
 	}
 }
 
-func (pb *processorBuild) steps() []string {
+func (cb connectorBuild) key() string {
+	return cb.goPkg
+}
+
+type processorBuild struct {
+	targetDir string
+	procUrl   string
+	name      string
+}
+
+func (pb processorBuild) steps() []string {
 	return []string{
 		fmt.Sprintf(
-			"wget %s -P %s", pb.procUrl, pb.targetDir,
+			"wget -O %s/%s %s", pb.targetDir, filepath.Base(pb.procUrl), pb.procUrl,
 		),
 	}
 }
 
-func (c *connectorCommandBuilder) renderScript() string {
+func (pb processorBuild) key() string {
+	return pb.name
+}
+
+func (c *commandBuilder[T]) renderScript() string {
 	var final []string
 	for _, build := range c.builds {
 		final = append(final, build.steps()...)
 	}
+	log.Println(strings.Join(final, " && "))
 	return strings.Join(final, " && ")
 }
 
-func (c *connectorCommandBuilder) empty() bool {
+func (c *commandBuilder[T]) empty() bool {
 	c.Lock()
 	defer c.Unlock()
 	return len(c.builds) == 0
 }
 
-func (c *connectorCommandBuilder) addConnectorBuild(b connectorBuild) {
+func (c *commandBuilder[T]) addBuild(b T) {
 	c.Lock()
 	defer c.Unlock()
-
 	if c.done == nil {
 		c.done = make(map[string]bool)
 	}
-
-	if _, ok := c.done[b.goPkg]; ok {
+	key := b.key()
+	if _, ok := c.done[key]; ok {
 		return
 	}
-
 	c.builds = append(c.builds, b)
-	c.done[b.goPkg] = true
-}
-
-func (p *processorCommandBuilder) renderScript() string {
-	var final []string
-	for _, build := range p.builds {
-		final = append(final, build.steps()...)
-	}
-	return strings.Join(final, " && ")
-}
-
-func (p *processorCommandBuilder) empty() bool {
-	p.Lock()
-	defer p.Unlock()
-	return len(p.builds) == 0
-}
-
-func (p *processorCommandBuilder) addProcessorBuild(b processorBuild) {
-	p.Lock()
-	defer p.Unlock()
-
-	if p.done == nil {
-		p.done = make(map[string]bool)
-	}
-
-	if _, ok := p.done[b.name]; ok {
-		return
-	}
-
-	p.builds = append(p.builds, b)
-	p.done[b.name] = true
+	c.done[key] = true
 }
 
 // ConduitInitContainers returns a slice of kubernetes container definitions
 func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
-	builder := &connectorCommandBuilder{}
-	pBuilder := &processorCommandBuilder{}
+	builder := &commandBuilder[connectorBuild]{}
+	pBuilder := &commandBuilder[processorBuild]{}
 
 	containers := []corev1.Container{
 		{
@@ -150,7 +126,7 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 
 	for _, c := range cc {
 		if !strings.HasPrefix(c.Plugin, "builtin") {
-			builder.addConnectorBuild(connectorBuild{
+			builder.addBuild(connectorBuild{
 				name:      fmt.Sprintf("%s-%s", filepath.Base(c.Plugin), c.PluginVersion),
 				goPkg:     c.PluginPkg,
 				tmpDir:    builderTempPath,
@@ -159,9 +135,8 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 			})
 		}
 		for _, p := range c.Processors {
-			log.Println(p)
 			if !strings.HasPrefix(p.Plugin, "builtin") && p.ProcessorURL != "" {
-				pBuilder.addProcessorBuild(processorBuild{name: p.Plugin, procUrl: p.ProcessorURL, targetDir: v1alpha.ConduitProcessorsPath})
+				pBuilder.addBuild(processorBuild{name: p.Plugin, procUrl: p.ProcessorURL, targetDir: v1alpha.ConduitProcessorsPath})
 			}
 		}
 	}
