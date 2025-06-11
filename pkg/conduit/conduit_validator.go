@@ -281,11 +281,13 @@ func pluginWASM(ctx context.Context, processorURL string) (string, func(), error
 	}
 	defer resp.Body.Close()
 
-	// save as tmp file and use for upload
 	file, err := os.CreateTemp("", "proc-*.wasm")
 	if err != nil {
 		return "", nil, err
 	}
+	defer func() {
+		file.Close()
+	}()
 
 	if _, err = io.Copy(file, resp.Body); err != nil {
 		return "", nil, err
@@ -295,7 +297,6 @@ func pluginWASM(ctx context.Context, processorURL string) (string, func(), error
 		if err := os.Remove(file.Name()); err != nil {
 			log.Println(err)
 		}
-		file.Close()
 	}, nil
 }
 
