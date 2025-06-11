@@ -184,7 +184,7 @@ func Test_ConduitInitConnectorContainers(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ConduitInitContainers(tc.connectors)
+			got := ConduitInitContainers(tc.connectors, []*v1alpha.ConduitProcessor{})
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Fatalf("container mismatch (-want +got): %v", diff)
 			}
@@ -207,11 +207,13 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 	tests := []struct {
 		name       string
 		connectors []*v1alpha.ConduitConnector
+		processors []*v1alpha.ConduitProcessor
 		imageVer   string
 		want       []corev1.Container
 	}{
 		{
-			name: "only builtin processors",
+			name:       "only builtin processors",
+			processors: []*v1alpha.ConduitProcessor{},
 			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
@@ -226,7 +228,8 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 			want: []corev1.Container{initContainer},
 		},
 		{
-			name: "standalone processor but no URL",
+			name:       "standalone processor but no URL",
+			processors: []*v1alpha.ConduitProcessor{},
 			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
@@ -241,7 +244,8 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 			want: []corev1.Container{initContainer},
 		},
 		{
-			name: "standalone processor with URL",
+			name:       "standalone processor with URL",
+			processors: []*v1alpha.ConduitProcessor{},
 			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
@@ -274,7 +278,8 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 			},
 		},
 		{
-			name: "same standalone processor in multiple connectors",
+			name:       "same standalone processor in multiple connectors",
+			processors: []*v1alpha.ConduitProcessor{},
 			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
@@ -317,7 +322,8 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple standalone processors",
+			name:       "multiple standalone processors",
+			processors: []*v1alpha.ConduitProcessor{},
 			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
@@ -354,7 +360,8 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple processors - one builtin, one standalone",
+			name:       "multiple processors - one builtin, one standalone",
+			processors: []*v1alpha.ConduitProcessor{},
 			connectors: []*v1alpha.ConduitConnector{
 				{
 					Plugin:        "builtin:builtin-test",
@@ -393,7 +400,7 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := ConduitInitContainers(tc.connectors)
+			got := ConduitInitContainers(tc.connectors, tc.processors)
 			if diff := cmp.Diff(tc.want, got); diff != "" {
 				t.Fatalf("container mismatch (-want +got): %v", diff)
 			}

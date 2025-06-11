@@ -102,7 +102,7 @@ func (c *commandBuilder[T]) addBuild(b T) {
 }
 
 // ConduitInitContainers returns a slice of kubernetes container definitions
-func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
+func ConduitInitContainers(cc []*v1alpha.ConduitConnector, cp []*v1alpha.ConduitProcessor) []corev1.Container {
 	builder := &commandBuilder[connectorBuild]{}
 	pBuilder := &commandBuilder[processorBuild]{}
 
@@ -140,7 +140,12 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 			}
 		}
 	}
-
+	// handles processors that are not part of a connector
+	for _, p := range cp {
+		if !strings.HasPrefix(p.Plugin, "builtin") && p.ProcessorURL != "" {
+			pBuilder.addBuild(processorBuild{name: p.Plugin, procUrl: p.ProcessorURL, targetDir: v1alpha.ConduitProcessorsPath})
+		}
+	}
 	if !builder.empty() {
 		containers = append(containers, corev1.Container{
 			Name:            fmt.Sprint(v1alpha.ConduitInitContainerName, "-connectors"),
