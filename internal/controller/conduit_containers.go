@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"log"
 	"path"
 	"path/filepath"
 	"strings"
@@ -17,10 +18,16 @@ const (
 	builderTempPath = "/tmp/connectors"
 )
 
-type commandBuilder struct {
+type connectorCommandBuilder struct {
 	sync.Mutex
 	done   map[string]bool
 	builds []connectorBuild // ordered
+}
+
+type processorCommandBuilder struct {
+	sync.Mutex
+	done   map[string]bool
+	builds []processorBuild // ordered
 }
 
 type connectorBuild struct {
@@ -29,6 +36,12 @@ type connectorBuild struct {
 	tmpDir    string
 	targetDir string
 	ldflags   string
+}
+
+type processorBuild struct {
+	targetDir string
+	procUrl   string
+	name      string
 }
 
 func (cb *connectorBuild) steps() []string {
@@ -44,7 +57,15 @@ func (cb *connectorBuild) steps() []string {
 	}
 }
 
-func (c *commandBuilder) renderScript() string {
+func (pb *processorBuild) steps() []string {
+	return []string{
+		fmt.Sprintf(
+			"wget %s -P %s", pb.procUrl, pb.targetDir,
+		),
+	}
+}
+
+func (c *connectorCommandBuilder) renderScript() string {
 	var final []string
 	for _, build := range c.builds {
 		final = append(final, build.steps()...)
@@ -52,13 +73,13 @@ func (c *commandBuilder) renderScript() string {
 	return strings.Join(final, " && ")
 }
 
-func (c *commandBuilder) empty() bool {
+func (c *connectorCommandBuilder) empty() bool {
 	c.Lock()
 	defer c.Unlock()
 	return len(c.builds) == 0
 }
 
-func (c *commandBuilder) addConnectorBuild(b connectorBuild) {
+func (c *connectorCommandBuilder) addConnectorBuild(b connectorBuild) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -74,9 +95,40 @@ func (c *commandBuilder) addConnectorBuild(b connectorBuild) {
 	c.done[b.goPkg] = true
 }
 
+func (p *processorCommandBuilder) renderScript() string {
+	var final []string
+	for _, build := range p.builds {
+		final = append(final, build.steps()...)
+	}
+	return strings.Join(final, " && ")
+}
+
+func (p *processorCommandBuilder) empty() bool {
+	p.Lock()
+	defer p.Unlock()
+	return len(p.builds) == 0
+}
+
+func (p *processorCommandBuilder) addProcessorBuild(b processorBuild) {
+	p.Lock()
+	defer p.Unlock()
+
+	if p.done == nil {
+		p.done = make(map[string]bool)
+	}
+
+	if _, ok := p.done[b.name]; ok {
+		return
+	}
+
+	p.builds = append(p.builds, b)
+	p.done[b.name] = true
+}
+
 // ConduitInitContainers returns a slice of kubernetes container definitions
 func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
-	builder := &commandBuilder{}
+	builder := &connectorCommandBuilder{}
+	pBuilder := &processorCommandBuilder{}
 
 	containers := []corev1.Container{
 		{
@@ -97,16 +149,21 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 	}
 
 	for _, c := range cc {
-		if strings.HasPrefix(c.Plugin, "builtin") {
-			continue
+		if !strings.HasPrefix(c.Plugin, "builtin") {
+			builder.addConnectorBuild(connectorBuild{
+				name:      fmt.Sprintf("%s-%s", filepath.Base(c.Plugin), c.PluginVersion),
+				goPkg:     c.PluginPkg,
+				tmpDir:    builderTempPath,
+				targetDir: v1alpha.ConduitConnectorsPath,
+				ldflags:   fmt.Sprintf(`-ldflags "-X 'github.com/%s.version=%s'"`, c.Plugin, c.PluginVersion),
+			})
 		}
-		builder.addConnectorBuild(connectorBuild{
-			name:      fmt.Sprintf("%s-%s", filepath.Base(c.Plugin), c.PluginVersion),
-			goPkg:     c.PluginPkg,
-			tmpDir:    builderTempPath,
-			targetDir: v1alpha.ConduitConnectorsPath,
-			ldflags:   fmt.Sprintf(`-ldflags "-X 'github.com/%s.version=%s'"`, c.Plugin, c.PluginVersion),
-		})
+		for _, p := range c.Processors {
+			log.Println(p)
+			if !strings.HasPrefix(p.Plugin, "builtin") && p.ProcessorURL != "" {
+				pBuilder.addProcessorBuild(processorBuild{name: p.Plugin, procUrl: p.ProcessorURL, targetDir: v1alpha.ConduitProcessorsPath})
+			}
+		}
 	}
 
 	if !builder.empty() {
@@ -117,6 +174,24 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector) []corev1.Container {
 			Args: []string{
 				"sh", "-xe",
 				"-c", builder.renderScript(),
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{
+					Name:      v1alpha.ConduitStorageVolumeMount,
+					MountPath: v1alpha.ConduitVolumePath,
+				},
+			},
+		})
+	}
+
+	if !pBuilder.empty() {
+		containers = append(containers, corev1.Container{
+			Name:            fmt.Sprint(v1alpha.ConduitInitContainerName, "-processors"),
+			Image:           v1alpha.ConduitInitImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
+			Args: []string{
+				"sh", "-xe",
+				"-c", pBuilder.renderScript(),
 			},
 			VolumeMounts: []corev1.VolumeMount{
 				{
