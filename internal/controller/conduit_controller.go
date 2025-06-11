@@ -412,6 +412,21 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 			return err
 		}
 
+		// Assign template specs to the pod template
+		if c.Spec.PodTemplate != nil {
+			deployment.Spec.Template.Spec.ServiceAccountName = c.Spec.PodTemplate.ServiceAccountName
+			deployment.Spec.Template.Spec.SecurityContext = c.Spec.PodTemplate.PodSecurityContext
+			deployment.Spec.Template.Spec.Resources = c.Spec.PodTemplate.Resources
+
+			for i := range spec.Template.Spec.InitContainers {
+				deployment.Spec.Template.Spec.InitContainers[i].SecurityContext = c.Spec.PodTemplate.ContainerSecurityContext
+			}
+
+			for i := range spec.Template.Spec.Containers {
+				deployment.Spec.Template.Spec.Containers[i].SecurityContext = c.Spec.PodTemplate.ContainerSecurityContext
+			}
+		}
+
 		// Ensure labels and annotations are always exact.
 		deployment.Spec.Selector.MatchLabels = matchLabels
 		deployment.Spec.Template.ObjectMeta.Labels = labels

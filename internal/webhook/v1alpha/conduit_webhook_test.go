@@ -40,7 +40,10 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 			is := is.New(t)
 			ctx := context.Background()
 			cl := fake.NewClientBuilder().Build()
-			v := &ConduitCustomValidator{conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation"))}
+			v := &ConduitCustomValidator{
+				c:                cl,
+				ValidatorService: conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation")),
+			}
 
 			fieldErr := v.validateConduitVersion(tc.ver)
 			if tc.expectedErr != nil {
@@ -113,7 +116,8 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			c := tc.setup()
 			cl := fake.NewClientBuilder().Build()
 			v := ConduitCustomValidator{
-				conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation")),
+				c:                cl,
+				ValidatorService: conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation")),
 			}
 
 			_, err := v.ValidateCreate(context.Background(), runtime.Object(c))
@@ -188,7 +192,8 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			c := tc.setup()
 			cl := fake.NewClientBuilder().Build()
 			v := ConduitCustomValidator{
-				conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation")),
+				c:                cl,
+				ValidatorService: conduit.NewValidator(ctx, cl, log.Log.WithName("webhook-validation")),
 			}
 
 			_, err := v.ValidateUpdate(context.Background(), runtime.Object(nil), runtime.Object(c))

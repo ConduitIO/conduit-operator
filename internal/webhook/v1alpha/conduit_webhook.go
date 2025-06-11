@@ -27,8 +27,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
@@ -54,7 +56,8 @@ func init() {
 func SetupConduitWebhookWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&v1alpha.Conduit{}).
 		WithValidator(&ConduitCustomValidator{
-			validation.NewValidator(ctx, mgr.GetClient(), log.Log.WithName("webhook-validation")),
+			c:                mgr.GetClient(),
+			ValidatorService: validation.NewValidator(ctx, mgr.GetClient(), log.Log.WithName("webhook-validation")),
 		}).
 		WithDefaulter(&ConduitCustomDefaulter{}).
 		Complete()
@@ -154,13 +157,10 @@ func (*ConduitCustomDefaulter) proccessorDefaulter(pp []*v1alpha.ConduitProcesso
 // when it is created, updated, or deleted.
 type ConduitCustomValidator struct {
 	validation.ValidatorService
+	c client.Client
 }
 
 var _ webhook.CustomValidator = &ConduitCustomValidator{}
-
-func NewConduitCustomValidator(validator validation.ValidatorService) *ConduitCustomValidator {
-	return &ConduitCustomValidator{validator}
-}
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Conduit.
 func (v *ConduitCustomValidator) ValidateCreate(ctx context.Context, obj runtime.Object) (admission.Warnings, error) {
@@ -188,6 +188,10 @@ func (v *ConduitCustomValidator) ValidateCreate(ctx context.Context, obj runtime
 
 	if err := v.validateRegistry(conduit.Spec.Registry); err != nil {
 		errs = append(errs, err)
+	}
+
+	if verrs := v.validatePodTemplate(ctx, conduit); len(verrs) > 0 {
+		errs = append(errs, verrs...)
 	}
 
 	if len(errs) > 0 {
@@ -288,6 +292,48 @@ func (*ConduitCustomValidator) validateRegistry(sr *v1alpha.SchemaRegistry) *fie
 			sr.URL,
 			err.Error(),
 		)
+	}
+
+	return nil
+}
+
+func (v *ConduitCustomValidator) validatePodTemplate(ctx context.Context, conduit *v1alpha.Conduit) field.ErrorList {
+	if conduit.Spec.PodTemplate == nil {
+		return nil
+	}
+
+	errs := field.ErrorList{}
+	fp := field.NewPath("spec").Child("podTemplate")
+
+	if err := v.validateServiceAccount(
+		ctx,
+		conduit.Spec.PodTemplate.ServiceAccountName,
+		conduit.Namespace, fp,
+	); err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(errs) > 0 {
+		return errs
+	}
+
+	return nil
+}
+
+func (v *ConduitCustomValidator) validateServiceAccount(ctx context.Context, sa, ns string, fp *field.Path) *field.Error {
+	if sa == "" {
+		return nil
+	}
+
+	serviceAccount := corev1.ServiceAccount{}
+	if err := v.c.Get(ctx, types.NamespacedName{
+		Name:      sa,
+		Namespace: ns,
+	}, &serviceAccount); err != nil {
+		if apierrors.IsNotFound(err) {
+			return field.Invalid(fp.Child("serviceAccount"), sa, "service account not found")
+		}
+		return field.Invalid(fp.Child("serviceAccount"), sa, err.Error())
 	}
 
 	return nil

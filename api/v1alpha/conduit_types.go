@@ -75,6 +75,8 @@ type ConduitSpec struct {
 	Registry   *SchemaRegistry     `json:"schemaRegistry,omitempty"`
 	Connectors []*ConduitConnector `json:"connectors,omitempty"`
 	Processors []*ConduitProcessor `json:"processors,omitempty"`
+
+	PodTemplate *ConduitPodTemplate `json:"podTemplate,omitempty"`
 }
 
 type ConduitConnector struct {
@@ -118,6 +120,14 @@ type SettingsVar struct {
 	Value        string                    `json:"value,omitempty"`
 	SecretRef    *corev1.SecretKeySelector `json:"secretRef,omitempty"`
 	ConfigMapRef *GlobalConfigMapRef       `json:"configMapRef,omitempty"`
+}
+
+// Settings will be applied to the conduit instance pod and containers.
+type ConduitPodTemplate struct {
+	ServiceAccountName       string                       `json:"serviceAccountName,omitempty"`
+	PodSecurityContext       *corev1.PodSecurityContext   `json:"podSecurityContext,omitempty"`
+	ContainerSecurityContext *corev1.SecurityContext      `json:"containerSecurityContext,omitempty"`
+	Resources                *corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
 // ConduitStatus defines the observed state of Conduit

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-account
+---
+apiVersion: operator.conduit.io/v1alpha
+kind: Conduit
+metadata:
+  name: conduit-generator
+spec:
+  podTemplate:
+    serviceAccountName: test-account
+#    podSecurityContext:
+#      runAsNonRoot: true
+    containerSecurityContext:
+      privileged: false
+  running: true
+  name: generator.log
+  description: generator pipeline
+  connectors:
+    - name: source-connector
+      type: source
+      plugin: builtin:generator
+      settings:
+        - name: format.type
+          value: structured
+        - name: format.options.id
+          value: "int"
+        - name: format.options.name
+          value: "string"
+        - name: format.options.company
+          value: "string"
+        - name: format.options.trial
+          value: "bool"
+        - name: recordCount
+          value: "3"
+    - name: destination-connector
+      type: destination
+      plugin: builtin:log
