@@ -396,6 +396,117 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "standalone processor at pipeline level",
+			processors: []*v1alpha.ConduitProcessor{
+				{
+					Plugin:       "standalone-processor",
+					ProcessorURL: "http://example.com/processor",
+				},
+			},
+			connectors: []*v1alpha.ConduitConnector{
+				{
+					Plugin:        "builtin:builtin-test",
+					PluginVersion: "latest",
+				},
+			},
+			want: []corev1.Container{
+				initContainer, {
+					Name:            "conduit-init-processors",
+					Image:           "golang:1.23-alpine",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args: []string{
+						"sh", "-xe",
+						"-c",
+						"wget -O /conduit.storage/processors/processor http://example.com/processor",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "conduit-storage",
+							MountPath: "/conduit.storage",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "same standalone processor at pipeline level and at connector level",
+			processors: []*v1alpha.ConduitProcessor{
+				{
+					Plugin:       "standalone-processor",
+					ProcessorURL: "http://example.com/processor",
+				},
+			},
+			connectors: []*v1alpha.ConduitConnector{
+				{
+					Plugin:        "builtin:builtin-test",
+					PluginVersion: "latest",
+					Processors: []*v1alpha.ConduitProcessor{
+						{
+							Plugin:       "standalone-processor",
+							ProcessorURL: "http://example.com/processor",
+						},
+					},
+				},
+			},
+			want: []corev1.Container{
+				initContainer, {
+					Name:            "conduit-init-processors",
+					Image:           "golang:1.23-alpine",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args: []string{
+						"sh", "-xe",
+						"-c",
+						"wget -O /conduit.storage/processors/processor http://example.com/processor",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "conduit-storage",
+							MountPath: "/conduit.storage",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "different standalone processor at pipeline level and at connector level",
+			processors: []*v1alpha.ConduitProcessor{
+				{
+					Plugin:       "standalone-processor1",
+					ProcessorURL: "http://example.com/processor1",
+				},
+			},
+			connectors: []*v1alpha.ConduitConnector{
+				{
+					Plugin:        "builtin:builtin-test",
+					PluginVersion: "latest",
+					Processors: []*v1alpha.ConduitProcessor{
+						{
+							Plugin:       "standalone-processor",
+							ProcessorURL: "http://example.com/processor",
+						},
+					},
+				},
+			},
+			want: []corev1.Container{
+				initContainer, {
+					Name:            "conduit-init-processors",
+					Image:           "golang:1.23-alpine",
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Args: []string{
+						"sh", "-xe",
+						"-c",
+						"wget -O /conduit.storage/processors/processor http://example.com/processor && wget -O /conduit.storage/processors/processor1 http://example.com/processor1",
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "conduit-storage",
+							MountPath: "/conduit.storage",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range tests {
