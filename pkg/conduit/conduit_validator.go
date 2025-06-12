@@ -66,12 +66,10 @@ type Releases struct {
 func NewValidator(ctx context.Context, cl client.Client, log logr.Logger) *Validator {
 	plugins, err := connectorList(ctx)
 	if err != nil {
-		fmt.Printf("error with list\n")
 		log.Error(err, "unable to construct connector validation list %w")
 		plugins = nil
 	}
 
-	fmt.Printf("returning validator\n")
 	return &Validator{
 		client:        cl,
 		log:           log,
@@ -98,7 +96,7 @@ func (v *Validator) ValidateConnector(ctx context.Context, c *v1alpha.ConduitCon
 	return nil
 }
 
-func (v *Validator) ValidateProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, reg *standalone.Registry, fp *field.Path) *field.Error {
+func (v *Validator) ValidateProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, reg PluginRegistry, fp *field.Path) *field.Error {
 	if err := v.validateProcessorPlugin(p, fp); err != nil {
 		return err
 	}
@@ -134,7 +132,7 @@ func (v *Validator) validateStandaloneProcessor(ctx context.Context, p *v1alpha.
 	}
 
 	// TODO compiling wasm host is whats taking a while: "compiling WASM module"
-	fmt.Printf("registering plugin %s\n", file)
+	fmt.Printf("registering plugin: ctx: %v, file: %s\n", ctx, file)
 	_, err = reg.Register(ctx, file)
 	if err != nil {
 		if errors.Is(err, plugin.ErrPluginAlreadyRegistered) {

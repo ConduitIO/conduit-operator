@@ -9,6 +9,9 @@ import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
 	"github.com/conduitio/conduit-operator/pkg/conduit"
+	validation "github.com/conduitio/conduit-operator/pkg/conduit"
+	"github.com/conduitio/conduit-operator/pkg/conduit/mock"
+	"github.com/conduitio/conduit/pkg/plugin"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,6 +57,9 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 }
 
 func TestWebhook_ValidateCreate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
 		name    string
 		setup   func() *v1alpha.Conduit
@@ -62,6 +68,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 		{
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
+				c := testutil.SetupSampleConduit(t)
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpResps := conduit.GetHTTPResps(t)
 				gomock.InOrder(
@@ -71,7 +78,17 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
 
-				return testutil.SetupSampleConduit(t)
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
+
+				return c
 			},
 		},
 		{
@@ -86,6 +103,16 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 				)
 
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
+
 				return testutil.SetupSourceProcConduit(t)
 			},
 		},
@@ -98,6 +125,16 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
 
 				return testutil.SetupSampleConduit(t)
 			},
@@ -171,6 +208,9 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 }
 
 func TestWebhook_ValidateUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
 		name    string
 		setup   func() *v1alpha.Conduit
@@ -187,7 +227,16 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["wasm"]),
 				)
-				// mock registry
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
 
 				return testutil.SetupSampleConduit(t)
 			},
@@ -204,6 +253,16 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 				)
 
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
+
 				return testutil.SetupSourceProcConduit(t)
 			},
 		},
@@ -216,6 +275,16 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
 
 				return testutil.SetupSampleConduit(t)
 			},
@@ -232,6 +301,16 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, plugin.ErrPluginAlreadyRegistered).
+					Times(1)
+				registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
 
 				return testutil.SetupSampleConduit(t)
 			},
@@ -296,7 +375,6 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
 			} else {
-				fmt.Printf("err %s\n", err)
 				is.True(err == nil)
 			}
 		})

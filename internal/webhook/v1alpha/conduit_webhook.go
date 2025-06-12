@@ -151,8 +151,6 @@ func (*ConduitCustomDefaulter) proccessorDefaulter(pp []*v1alpha.ConduitProcesso
 		if p.ID == "" {
 			p.ID = p.Name
 		}
-
-		// how are we handling standalone processors
 	}
 }
 
@@ -246,7 +244,7 @@ func (v *ConduitCustomValidator) ValidateDelete(_ context.Context, obj runtime.O
 
 // validateConnectors validates the attributes of connectors in the slice.
 // Error is return when the validation fails.
-func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v1alpha.ConduitConnector, r *standalone.Registry) field.ErrorList {
+func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v1alpha.ConduitConnector, r validation.PluginRegistry) field.ErrorList {
 	var errs field.ErrorList
 
 	fp := field.NewPath("spec").Child("connectors")
@@ -267,7 +265,7 @@ func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v
 	return nil
 }
 
-func (v *ConduitCustomValidator) validateProcessors(ctx context.Context, pp []*v1alpha.ConduitProcessor, r *standalone.Registry, fp *field.Path) field.ErrorList {
+func (v *ConduitCustomValidator) validateProcessors(ctx context.Context, pp []*v1alpha.ConduitProcessor, r validation.PluginRegistry, fp *field.Path) field.ErrorList {
 	var errs field.ErrorList
 
 	for _, p := range pp {
@@ -301,12 +299,7 @@ func (*ConduitCustomValidator) validateConduitVersion(ver string) *field.Error {
 	return nil
 }
 
-func registry(r *v1alpha.SchemaRegistry, fp *field.Path) (*standalone.Registry, *field.Error) {
-	if r == nil || r.URL == "" {
-		// TO TEST: is registry normally set?
-		return nil, field.InternalError(fp, fmt.Errorf("registry must be set"))
-	}
-
+var registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
 	cl, err := schemaregistry.NewClient(conduitLog.Nop(), sr.URLs(r.URL))
 	if err != nil {
 		return nil, field.Invalid(fp, sr.URLs(r.URL), fmt.Sprintf("failed to create schema registry: %s", err))
@@ -320,6 +313,15 @@ func registry(r *v1alpha.SchemaRegistry, fp *field.Path) (*standalone.Registry, 
 	}
 
 	return reg, nil
+}
+
+func registry(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
+	if r == nil || r.URL == "" {
+		// TO TEST: is registry normally set?
+		return nil, field.InternalError(fp, fmt.Errorf("registry must be set"))
+	}
+
+	return registryFactory(r, fp)
 }
 
 func (*ConduitCustomValidator) validateRegistry(sr *v1alpha.SchemaRegistry) *field.Error {
