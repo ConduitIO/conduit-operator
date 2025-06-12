@@ -35,8 +35,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	validation "github.com/conduitio/conduit-operator/pkg/conduit"
-	conduitlog "github.com/conduitio/conduit/pkg/foundation/log"
+	conduitLog "github.com/conduitio/conduit/pkg/foundation/log"
+	"github.com/conduitio/conduit/pkg/plugin/processor/procutils"
+	"github.com/conduitio/conduit/pkg/plugin/processor/standalone"
 	"github.com/conduitio/conduit/pkg/schemaregistry"
+	"github.com/rs/zerolog"
 	"github.com/twmb/franz-go/pkg/sr"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -184,19 +187,19 @@ func (v *ConduitCustomValidator) ValidateCreate(ctx context.Context, obj runtime
 		errs = append(errs, err)
 	}
 
-	sr, err := schemaRegistry(conduit.Spec.Registry, field.NewPath("schemaregistry"))
+	r, err := registry(conduit.Spec.Registry, field.NewPath("schemaregistry"))
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	if verrs := v.validateConnectors(ctx, conduit.Spec.Connectors, sr); len(verrs) > 0 {
+	if verrs := v.validateConnectors(ctx, conduit.Spec.Connectors, r); len(verrs) > 0 {
 		errs = append(errs, verrs...)
 	}
 
 	if verrs := v.validateProcessors(
 		ctx,
 		conduit.Spec.Processors,
-		sr,
+		r,
 		field.NewPath("spec").Child("processors"),
 	); len(verrs) > 0 {
 		errs = append(errs, verrs...)
@@ -216,16 +219,16 @@ func (v *ConduitCustomValidator) ValidateUpdate(ctx context.Context, _, newObj r
 		return nil, fmt.Errorf("expected a Conduit object for the newObj but got %T", newObj)
 	}
 
-	sr, err := schemaRegistry(conduit.Spec.Registry, field.NewPath("schemaregistry"))
+	r, err := registry(conduit.Spec.Registry, field.NewPath("schemaregistry"))
 	if err != nil {
 		return nil, fmt.Errorf("failed creating schema registry %w", err)
 	}
 
-	if errs := v.validateConnectors(ctx, conduit.Spec.Connectors, sr); len(errs) > 0 {
+	if errs := v.validateConnectors(ctx, conduit.Spec.Connectors, r); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
 	}
 
-	if errs := v.validateProcessors(ctx, conduit.Spec.Processors, sr, field.NewPath("spec").Child("processors")); len(errs) > 0 {
+	if errs := v.validateProcessors(ctx, conduit.Spec.Processors, r, field.NewPath("spec").Child("processors")); len(errs) > 0 {
 		return nil, apierrors.NewInvalid(v1alpha.GroupKind, conduit.Name, errs)
 	}
 
@@ -243,7 +246,7 @@ func (v *ConduitCustomValidator) ValidateDelete(_ context.Context, obj runtime.O
 
 // validateConnectors validates the attributes of connectors in the slice.
 // Error is return when the validation fails.
-func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v1alpha.ConduitConnector, sr schemaregistry.Registry) field.ErrorList {
+func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v1alpha.ConduitConnector, r *standalone.Registry) field.ErrorList {
 	var errs field.ErrorList
 
 	fp := field.NewPath("spec").Child("connectors")
@@ -252,7 +255,7 @@ func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v
 			errs = append(errs, err)
 		}
 
-		if procErrs := v.validateProcessors(ctx, c.Processors, sr, fp); procErrs != nil {
+		if procErrs := v.validateProcessors(ctx, c.Processors, r, fp); procErrs != nil {
 			errs = append(errs, procErrs...)
 		}
 	}
@@ -264,15 +267,11 @@ func (v *ConduitCustomValidator) validateConnectors(ctx context.Context, cc []*v
 	return nil
 }
 
-func (v *ConduitCustomValidator) validateProcessors(ctx context.Context, pp []*v1alpha.ConduitProcessor, sr schemaregistry.Registry, fp *field.Path) field.ErrorList {
+func (v *ConduitCustomValidator) validateProcessors(ctx context.Context, pp []*v1alpha.ConduitProcessor, r *standalone.Registry, fp *field.Path) field.ErrorList {
 	var errs field.ErrorList
 
 	for _, p := range pp {
-		if err := v.ValidateProcessorPlugin(p, fp); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		if err := v.ValidateProcessorSchema(ctx, p, sr, fp); err != nil {
+		if err := v.ValidateProcessor(ctx, p, r, fp); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -302,18 +301,25 @@ func (*ConduitCustomValidator) validateConduitVersion(ver string) *field.Error {
 	return nil
 }
 
-func schemaRegistry(reg *v1alpha.SchemaRegistry, fp *field.Path) (schemaregistry.Registry, *field.Error) {
-	if reg == nil || reg.URL == "" {
+func registry(r *v1alpha.SchemaRegistry, fp *field.Path) (*standalone.Registry, *field.Error) {
+	if r == nil || r.URL == "" {
 		// TO TEST: is registry normally set?
 		return nil, field.InternalError(fp, fmt.Errorf("registry must be set"))
 	}
 
-	cl, err := schemaregistry.NewClient(conduitlog.Nop(), sr.URLs(reg.URL))
+	cl, err := schemaregistry.NewClient(conduitLog.Nop(), sr.URLs(r.URL))
 	if err != nil {
-		return nil, field.Invalid(fp, sr.URLs(reg.URL), fmt.Sprintf("failed to create schema registry: %s", err))
+		return nil, field.Invalid(fp, sr.URLs(r.URL), fmt.Sprintf("failed to create schema registry: %s", err))
 	}
 
-	return cl, nil
+	conduitLogger := conduitLog.InitLogger(zerolog.DebugLevel, conduitLog.FormatJSON)
+	procSchemaService := procutils.NewSchemaService(conduitLogger, cl)
+	reg, err := standalone.NewRegistry(conduitLogger, "/tmp", procSchemaService)
+	if err != nil {
+		return nil, field.InternalError(fp.Child("schema"), fmt.Errorf("failed to create standalone registry: %w", err))
+	}
+
+	return reg, nil
 }
 
 func (*ConduitCustomValidator) validateRegistry(sr *v1alpha.SchemaRegistry) *field.Error {

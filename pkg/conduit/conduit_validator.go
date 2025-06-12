@@ -1,4 +1,5 @@
-//go:generate mockgen --build_flags=--mod=mod -source=./conduit_validator.go -destination=mock/http_client_mock.go -package=mock
+//go:generate mockgen --build_flags=--mod=mod -source=./http_client.go -destination=mock/http_client_mock.go -package=mock
+//go:generate mockgen --build_flags=--mod=mod -source=./plugin_registry.go -destination=mock/registry_mock.go -package=mock
 
 package conduit
 
@@ -17,13 +18,10 @@ import (
 	"github.com/conduitio/conduit-commons/config"
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
-	conduitLog "github.com/conduitio/conduit/pkg/foundation/log"
-	"github.com/conduitio/conduit/pkg/plugin/processor/procutils"
+	"github.com/conduitio/conduit/pkg/plugin"
 	"github.com/conduitio/conduit/pkg/plugin/processor/standalone"
 	pconfig "github.com/conduitio/conduit/pkg/provisioning/config"
-	"github.com/conduitio/conduit/pkg/schemaregistry"
 	"github.com/go-logr/logr"
-	"github.com/rs/zerolog"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,9 +35,7 @@ const (
 
 var HTTPClient httpClient = http.DefaultClient
 
-type httpClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
+var _ PluginRegistry = (*standalone.Registry)(nil)
 
 var _ ValidatorService = (*Validator)(nil)
 
@@ -70,10 +66,12 @@ type Releases struct {
 func NewValidator(ctx context.Context, cl client.Client, log logr.Logger) *Validator {
 	plugins, err := connectorList(ctx)
 	if err != nil {
+		fmt.Printf("error with list\n")
 		log.Error(err, "unable to construct connector validation list %w")
 		plugins = nil
 	}
 
+	fmt.Printf("returning validator\n")
 	return &Validator{
 		client:        cl,
 		log:           log,
@@ -100,34 +98,50 @@ func (v *Validator) ValidateConnector(ctx context.Context, c *v1alpha.ConduitCon
 	return nil
 }
 
-func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+func (v *Validator) ValidateProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, reg *standalone.Registry, fp *field.Path) *field.Error {
+	if err := v.validateProcessorPlugin(p, fp); err != nil {
+		return err
+	}
+
+	if err := v.validateStandaloneProcessor(ctx, p, reg, fp); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v *Validator) validateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
 	if p.Plugin == "" {
 		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
 	return nil
 }
 
-func (v *Validator) ValidateProcessorSchema(ctx context.Context, p *v1alpha.ConduitProcessor, sr schemaregistry.Registry, fp *field.Path) *field.Error {
-	// will be getting an incoming URL to pull from pocketbase with the incoming standalone processor
-	// url is passed in, call to pocketbase to get processor file
+func (v *Validator) validateStandaloneProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, reg PluginRegistry, fp *field.Path) *field.Error {
+	fmt.Printf("validateStandaloneProcessor\n")
+	if p.ProcessorURL == "" {
+		fmt.Printf("proc url nil\n")
+		return nil
+	}
+
 	file, cleanup, err := pluginWASM(ctx, p.ProcessorURL)
 	if err != nil {
-		return field.InternalError(fp.Child("schema"), fmt.Errorf("failed to save wasm to file: %w", err))
+		fmt.Printf("error occurred %s\n", err)
+		return field.InternalError(fp.Child("standalone"), fmt.Errorf("failed to save wasm to file: %w", err))
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	conduitLogger := conduitLog.InitLogger(zerolog.DebugLevel, conduitLog.FormatJSON)
-	procSchemaService := procutils.NewSchemaService(conduitLogger, sr)
-	reg, err := standalone.NewRegistry(conduitLogger, "/tmp", procSchemaService)
-	if err != nil {
-		return field.InternalError(fp.Child("schema"), fmt.Errorf("failed to create standalone registry: %w", err))
-	}
-
+	// TODO compiling wasm host is whats taking a while: "compiling WASM module"
+	fmt.Printf("registering plugin %s\n", file)
 	_, err = reg.Register(ctx, file)
 	if err != nil {
-		return field.InternalError(fp.Child("schema"), fmt.Errorf("failed to register: %w", err))
+		if errors.Is(err, plugin.ErrPluginAlreadyRegistered) {
+			fmt.Printf("plugin registered\n")
+			return nil
+		}
+		return field.InternalError(fp.Child("standalone"), fmt.Errorf("failed to register: %w", err))
 	}
 
 	return nil
@@ -222,6 +236,7 @@ func (v *Validator) fetchYAMLSpec(ctx context.Context, c *v1alpha.ConduitConnect
 		return emptySpecFn, fmt.Errorf("creating the http request %w", err)
 	}
 
+	fmt.Println("http - spec")
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return emptySpecFn, fmt.Errorf("getting yaml from cache with error %w", err)
@@ -272,6 +287,7 @@ func pluginWASM(ctx context.Context, processorURL string) (string, func(), error
 		return "", nil, err
 	}
 
+	fmt.Println("http - wasm")
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", nil, err
@@ -309,6 +325,7 @@ func connectorList(ctx context.Context) (map[string]PluginInfo, error) {
 		return nil, err
 	}
 
+	fmt.Println("http - list")
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
