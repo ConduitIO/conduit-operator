@@ -2,7 +2,6 @@ package controller
 
 import (
 	"fmt"
-	"log"
 	"path"
 	"path/filepath"
 	"strings"
@@ -56,14 +55,14 @@ func (cb connectorBuild) key() string {
 
 type processorBuild struct {
 	targetDir string
-	procUrl   string
+	procURL   string
 	name      string
 }
 
 func (pb processorBuild) steps() []string {
 	return []string{
 		fmt.Sprintf(
-			"wget -O %s/%s %s", pb.targetDir, filepath.Base(pb.procUrl), pb.procUrl,
+			"wget -O %s/%s %s", pb.targetDir, filepath.Base(pb.procURL), pb.procURL,
 		),
 	}
 }
@@ -77,7 +76,6 @@ func (c *commandBuilder[T]) renderScript() string {
 	for _, build := range c.builds {
 		final = append(final, build.steps()...)
 	}
-	log.Println(strings.Join(final, " && "))
 	return strings.Join(final, " && ")
 }
 
@@ -124,6 +122,7 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector, cp []*v1alpha.Conduit
 		},
 	}
 
+	allProcessors := cp
 	for _, c := range cc {
 		if !strings.HasPrefix(c.Plugin, "builtin") {
 			builder.addBuild(connectorBuild{
@@ -134,16 +133,14 @@ func ConduitInitContainers(cc []*v1alpha.ConduitConnector, cp []*v1alpha.Conduit
 				ldflags:   fmt.Sprintf(`-ldflags "-X 'github.com/%s.version=%s'"`, c.Plugin, c.PluginVersion),
 			})
 		}
-		for _, p := range c.Processors {
-			if !strings.HasPrefix(p.Plugin, "builtin") && p.ProcessorURL != "" {
-				pBuilder.addBuild(processorBuild{name: p.Plugin, procUrl: p.ProcessorURL, targetDir: v1alpha.ConduitProcessorsPath})
-			}
+		if len(c.Processors) > 0 {
+			allProcessors = append(allProcessors, c.Processors...)
 		}
 	}
-	// handles processors that are not part of a connector
-	for _, p := range cp {
+	// handles standalone processors that need WASM downloaded
+	for _, p := range allProcessors {
 		if !strings.HasPrefix(p.Plugin, "builtin") && p.ProcessorURL != "" {
-			pBuilder.addBuild(processorBuild{name: p.Plugin, procUrl: p.ProcessorURL, targetDir: v1alpha.ConduitProcessorsPath})
+			pBuilder.addBuild(processorBuild{name: p.Plugin, procURL: p.ProcessorURL, targetDir: v1alpha.ConduitProcessorsPath})
 		}
 	}
 	if !builder.empty() {

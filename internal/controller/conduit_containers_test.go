@@ -496,7 +496,7 @@ func Test_ConduitInitProcessorsContainers(t *testing.T) {
 					Args: []string{
 						"sh", "-xe",
 						"-c",
-						"wget -O /conduit.storage/processors/processor http://example.com/processor && wget -O /conduit.storage/processors/processor1 http://example.com/processor1",
+						"wget -O /conduit.storage/processors/processor1 http://example.com/processor1 && wget -O /conduit.storage/processors/processor http://example.com/processor",
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
