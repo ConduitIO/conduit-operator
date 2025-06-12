@@ -435,8 +435,8 @@ func TestValidator_StandaloneProcessor(t *testing.T) {
 				name := plugin.NewFullName(plugin.PluginTypeStandalone, p.Name, "latest")
 				mockRegistry.EXPECT().
 					Register(gomock.Any(), gomock.Any()).
-					Return(name, nil)
-				fmt.Printf("registry expect setup\n")
+					Return(name, nil).
+					Times(1)
 
 				// mock call to get wasm
 				webClient := SetupHTTPMockClient(t)
@@ -446,7 +446,6 @@ func TestValidator_StandaloneProcessor(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
 
-				fmt.Printf("returning from setup\n")
 				return &p, mockRegistry
 			},
 		},
@@ -499,20 +498,14 @@ func TestValidator_StandaloneProcessor(t *testing.T) {
 			name: "error during wasm check",
 			setup: func() (*v1alpha.ConduitProcessor, PluginRegistry) {
 				p := standaloneProc
-
-				// create registry
 				mockRegistry := mock.NewMockPluginRegistry(ctrl)
-				name := plugin.NewFullName(plugin.PluginTypeStandalone, p.Name, "latest")
-				mockRegistry.EXPECT().
-					Register(gomock.Any(), gomock.Any()).
-					Return(name, nil).
-					Times(0)
 
-				// mock call to fail
 				webClient := SetupHTTPMockClient(t)
-				// httpResps := GetHTTPResps(t)
-
-				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM"))
+				httpResps := GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+				)
 
 				return &p, mockRegistry
 			},
@@ -531,7 +524,8 @@ func TestValidator_StandaloneProcessor(t *testing.T) {
 				name := plugin.NewFullName(plugin.PluginTypeStandalone, p.Name, "latest")
 				mockRegistry.EXPECT().
 					Register(gomock.Any(), gomock.Any()).
-					Return(name, errors.New("BOOM"))
+					Return(name, errors.New("BOOM")).
+					Times(1)
 
 				// mock call to fail
 				webClient := SetupHTTPMockClient(t)
@@ -579,18 +573,16 @@ func TestValidator_StandaloneProcessor(t *testing.T) {
 			is := is.New(t)
 			logger := testr.New(t)
 			ctx := context.Background()
+			p, reg := tc.setup()
 			cl := fake.NewClientBuilder().Build()
 			v := NewValidator(ctx, cl, logger)
 			fp := field.NewPath("spec").Child("processors")
-			p, reg := tc.setup()
 
-			fmt.Printf("calling from test\n")
 			err := v.validateStandaloneProcessor(ctx, p, reg, fp)
 			if tc.wantErr != nil {
 				assert.NotNil(t, err)
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
-				fmt.Printf("error: %s", err)
 				is.True(err == nil)
 			}
 		})

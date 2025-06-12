@@ -116,27 +116,21 @@ func (v *Validator) validateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *fie
 }
 
 func (v *Validator) validateStandaloneProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, reg PluginRegistry, fp *field.Path) *field.Error {
-	fmt.Printf("validateStandaloneProcessor\n")
 	if p.ProcessorURL == "" {
-		fmt.Printf("proc url nil\n")
 		return nil
 	}
 
 	file, cleanup, err := pluginWASM(ctx, p.ProcessorURL)
 	if err != nil {
-		fmt.Printf("error occurred %s\n", err)
 		return field.InternalError(fp.Child("standalone"), fmt.Errorf("failed to save wasm to file: %w", err))
 	}
 	if cleanup != nil {
 		defer cleanup()
 	}
 
-	// TODO compiling wasm host is whats taking a while: "compiling WASM module"
-	fmt.Printf("registering plugin: ctx: %v, file: %s\n", ctx, file)
 	_, err = reg.Register(ctx, file)
 	if err != nil {
 		if errors.Is(err, plugin.ErrPluginAlreadyRegistered) {
-			fmt.Printf("plugin registered\n")
 			return nil
 		}
 		return field.InternalError(fp.Child("standalone"), fmt.Errorf("failed to register: %w", err))
@@ -234,7 +228,6 @@ func (v *Validator) fetchYAMLSpec(ctx context.Context, c *v1alpha.ConduitConnect
 		return emptySpecFn, fmt.Errorf("creating the http request %w", err)
 	}
 
-	fmt.Println("http - spec")
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return emptySpecFn, fmt.Errorf("getting yaml from cache with error %w", err)
