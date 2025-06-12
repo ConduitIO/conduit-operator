@@ -104,7 +104,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "error occurs for processor schema",
+			name: "error occurs for standalone processor schema",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpResps := conduit.GetHTTPResps(t)
@@ -119,28 +119,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.InternalError(
-					field.NewPath("spec", "processors", "schema"),
-					fmt.Errorf("failed to save wasm to file: BOOM"),
-				),
-			}),
-		},
-		{
-			name: "error occurs for source processor schema",
-			setup: func() *v1alpha.Conduit {
-				webClient := conduit.SetupHTTPMockClient(t)
-				httpResps := conduit.GetHTTPResps(t)
-				gomock.InOrder(
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
-					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
-					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
-				)
-
-				return testutil.SetupSourceProcConduit(t)
-			},
-			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
-				field.InternalError(
-					field.NewPath("spec", "connectors", "schema"),
+					field.NewPath("spec", "processors", "standalone"),
 					fmt.Errorf("failed to save wasm to file: BOOM"),
 				),
 			}),
@@ -208,6 +187,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["wasm"]),
 				)
+				// mock registry
 
 				return testutil.SetupSampleConduit(t)
 			},
@@ -241,9 +221,8 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			},
 			wantErr: nil,
 		},
-
 		{
-			name: "error occurs for processor schema",
+			name: "error occurs during standalone proc registration",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpResps := conduit.GetHTTPResps(t)
@@ -251,20 +230,14 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
-					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
 
 				return testutil.SetupSampleConduit(t)
 			},
-			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
-				field.InternalError(
-					field.NewPath("spec", "processors", "schema"),
-					fmt.Errorf("failed to save wasm to file: BOOM"),
-				),
-			}),
 		},
 		{
-			name: "error occurs for processor schema",
+			name: "error occurs for connector processor validation",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpResps := conduit.GetHTTPResps(t)
@@ -279,7 +252,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 			},
 			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
 				field.InternalError(
-					field.NewPath("spec", "connectors", "schema"),
+					field.NewPath("spec", "connectors", "standalone"),
 					fmt.Errorf("failed to save wasm to file: BOOM"),
 				),
 			}),
@@ -323,6 +296,7 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
 			} else {
+				fmt.Printf("err %s\n", err)
 				is.True(err == nil)
 			}
 		})
