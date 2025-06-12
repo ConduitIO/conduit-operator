@@ -42,7 +42,7 @@ var ConduitConditions = NewConditionSet(
 )
 
 const (
-	ConduitVersion             = "v0.13.4"
+	ConduitVersion             = "v0.13.6"
 	ConduitImage               = "ghcr.io/conduitio/conduit"
 	ConduitContainerName       = "conduit-server"
 	ConduitPipelinePath        = "/conduit.pipelines"
