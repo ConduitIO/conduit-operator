@@ -317,7 +317,6 @@ var registryFactory = func(r *v1alpha.SchemaRegistry, fp *field.Path) (validatio
 
 func registry(r *v1alpha.SchemaRegistry, fp *field.Path) (validation.PluginRegistry, *field.Error) {
 	if r == nil || r.URL == "" {
-		// TO TEST: is registry normally set?
 		return nil, field.InternalError(fp, fmt.Errorf("registry must be set"))
 	}
 
