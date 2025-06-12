@@ -415,6 +415,7 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 	}
 }
 
+//nolint:bodyclose // Body is closed in the validator, bodyclose is not recognizing this.
 func TestValidator_StandaloneProcessor(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
