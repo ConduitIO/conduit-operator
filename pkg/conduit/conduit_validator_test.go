@@ -11,6 +11,8 @@ import (
 
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
+	"github.com/conduitio/conduit-operator/pkg/conduit/mock"
+	"github.com/conduitio/conduit/pkg/plugin"
 	"github.com/go-logr/logr/testr"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
@@ -21,6 +23,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+var standaloneProc = v1alpha.ConduitProcessor{
+	ID:           "proc1",
+	Name:         "proc1",
+	Plugin:       "builtin:base64.encode",
+	Workers:      2,
+	Condition:    "{{ eq .Metadata.key \"pipeline\" }}",
+	ProcessorURL: "http://127.0.0.1:8090/api/files/processors/RECORD_ID/FILENAME",
+	Settings: []v1alpha.SettingsVar{
+		{
+			Name: "setting01",
+			SecretRef: &corev1.SecretKeySelector{
+				Key: "setting01-%p-key",
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: "setting01-secret-name",
+				},
+			},
+		},
+		{
+			Name:  "setting02",
+			Value: "setting02-val",
+		},
+	},
+}
 
 func TestValidator_ConnectorPlugin(t *testing.T) {
 	tests := []struct {
@@ -151,7 +177,7 @@ func TestValidator_ProcessorPlugin(t *testing.T) {
 			cl := fake.NewClientBuilder().Build()
 			v := NewValidator(ctx, cl, logger)
 
-			err := v.ValidateProcessorPlugin(c.Spec.Processors[0], fp)
+			err := v.validateProcessorPlugin(c.Spec.Processors[0], fp)
 			if tc.wantErr != nil {
 				is.True(err != nil)
 				is.Equal(err.Error(), tc.wantErr.Error())
@@ -384,6 +410,180 @@ func TestValidator_ConnectorParameters(t *testing.T) {
 				is.Equal(tc.wantErr.Error(), err.Error())
 			} else {
 				is.Equal(err, nil)
+			}
+		})
+	}
+}
+
+//nolint:bodyclose // Body is closed in the validator, bodyclose is not recognizing this.
+func TestValidator_StandaloneProcessor(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	tests := []struct {
+		name    string
+		setup   func() (*v1alpha.ConduitProcessor, PluginRegistry)
+		wantErr error
+	}{
+		{
+			name: "registration succeeds",
+			setup: func() (*v1alpha.ConduitProcessor, PluginRegistry) {
+				p := standaloneProc
+
+				// create registry
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, p.Name, "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+
+				// mock call to get wasm
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
+
+				return &p, mockRegistry
+			},
+		},
+		{
+			name: "builtin processor",
+			setup: func() (*v1alpha.ConduitProcessor, PluginRegistry) {
+				p := v1alpha.ConduitProcessor{
+					ID:        "proc1",
+					Name:      "proc1",
+					Plugin:    "builtin:base64.encode",
+					Workers:   2,
+					Condition: "{{ eq .Metadata.key \"pipeline\" }}",
+					Settings: []v1alpha.SettingsVar{
+						{
+							Name: "setting01",
+							SecretRef: &corev1.SecretKeySelector{
+								Key: "setting01-%p-key",
+								LocalObjectReference: corev1.LocalObjectReference{
+									Name: "setting01-secret-name",
+								},
+							},
+						},
+						{
+							Name:  "setting02",
+							Value: "setting02-val",
+						},
+					},
+				}
+
+				// create registry
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, p.Name, "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(0)
+
+				// mock call to get wasm
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
+
+				return &p, mockRegistry
+			},
+		},
+		{
+			name: "error during wasm check",
+			setup: func() (*v1alpha.ConduitProcessor, PluginRegistry) {
+				p := standaloneProc
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+				)
+
+				return &p, mockRegistry
+			},
+			wantErr: field.InternalError(
+				field.NewPath("spec", "processors", "standalone"),
+				fmt.Errorf("failed to save wasm to file: BOOM"),
+			),
+		},
+		{
+			name: "error during registration",
+			setup: func() (*v1alpha.ConduitProcessor, PluginRegistry) {
+				p := standaloneProc
+
+				// create registry
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, p.Name, "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, errors.New("BOOM")).
+					Times(1)
+
+				// mock call to fail
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
+
+				return &p, mockRegistry
+			},
+			wantErr: field.InternalError(
+				field.NewPath("spec", "processors", "standalone"),
+				fmt.Errorf("failed to register: BOOM"),
+			),
+		},
+		{
+			name: "plugin already registered",
+			setup: func() (*v1alpha.ConduitProcessor, PluginRegistry) {
+				p := standaloneProc
+
+				// create registry
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, p.Name, "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, plugin.ErrPluginAlreadyRegistered).
+					Times(1)
+
+				// mock call to fail
+				webClient := SetupHTTPMockClient(t)
+				httpResps := GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
+
+				return &p, mockRegistry
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(_ *testing.T) {
+			is := is.New(t)
+			logger := testr.New(t)
+			ctx := context.Background()
+			p, reg := tc.setup()
+			cl := fake.NewClientBuilder().Build()
+			v := NewValidator(ctx, cl, logger)
+			fp := field.NewPath("spec").Child("processors")
+
+			err := v.validateStandaloneProcessor(ctx, p, reg, fp)
+			if tc.wantErr != nil {
+				assert.NotNil(t, err)
+				is.Equal(tc.wantErr.Error(), err.Error())
+			} else {
+				is.True(err == nil)
 			}
 		})
 	}

@@ -17,6 +17,9 @@ var connectorYAMLResp string
 //go:embed testdata/connector-list.json
 var connectorListResp string
 
+//go:embed testdata/proc.wasm
+var procWASMResp string
+
 func SetupHTTPMockClient(t *testing.T) *mock.MockhttpClient {
 	t.Helper()
 	ctrl := gomock.NewController(t)
@@ -49,6 +52,15 @@ func GetHTTPResps(t *testing.T) map[string]func(*http.Request) (*http.Response, 
 		return resp, nil
 	}
 	respMap["spec"] = respFn
+
+	respFn = func(_ *http.Request) (*http.Response, error) {
+		resp := &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(strings.NewReader(procWASMResp)),
+		}
+		return resp, nil
+	}
+	respMap["wasm"] = respFn
 
 	return respMap
 }

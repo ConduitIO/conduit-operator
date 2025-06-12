@@ -9,6 +9,8 @@ import (
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
 	"github.com/conduitio/conduit-operator/internal/testutil"
 	"github.com/conduitio/conduit-operator/pkg/conduit"
+	"github.com/conduitio/conduit-operator/pkg/conduit/mock"
+	"github.com/conduitio/conduit/pkg/plugin"
 	"github.com/golang/mock/gomock"
 	"github.com/matryer/is"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,6 +56,9 @@ func TestWebhookValidate_ConduitVersion(t *testing.T) {
 }
 
 func TestWebhook_ValidateCreate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
 		name    string
 		setup   func() *v1alpha.Conduit
@@ -62,26 +67,98 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 		{
 			name: "validation is successful",
 			setup: func() *v1alpha.Conduit {
+				c := testutil.SetupSampleConduit(t)
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpResps := conduit.GetHTTPResps(t)
 				gomock.InOrder(
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
 
-				return testutil.SetupSampleConduit(t)
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(_ *v1alpha.SchemaRegistry, _ *field.Path) (conduit.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
+
+				return c
 			},
 		},
 		{
-			name: "error occurs on http call",
+			name: "validates pipeline with source processors",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
-				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(_ *v1alpha.SchemaRegistry, _ *field.Path) (conduit.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
+
+				return testutil.SetupSourceProcConduit(t)
+			},
+		},
+		{
+			name: "error occurs for connector params",
+			setup: func() *v1alpha.Conduit {
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(_ *v1alpha.SchemaRegistry, _ *field.Path) (conduit.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
 
 				return testutil.SetupSampleConduit(t)
 			},
 			wantErr: nil,
+		},
+		{
+			name: "error occurs for standalone processor schema",
+			setup: func() *v1alpha.Conduit {
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+				)
+
+				return testutil.SetupSampleConduit(t)
+			},
+			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
+				field.InternalError(
+					field.NewPath("spec", "processors", "standalone"),
+					fmt.Errorf("failed to save wasm to file: BOOM"),
+				),
+			}),
 		},
 		{
 			name: "error occurs during validation",
@@ -92,6 +169,7 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
 				)
 
 				return testutil.SetupBadValidationConduit(t)
@@ -129,6 +207,9 @@ func TestWebhook_ValidateCreate(t *testing.T) {
 }
 
 func TestWebhook_ValidateUpdate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tests := []struct {
 		name    string
 		setup   func() *v1alpha.Conduit
@@ -143,23 +224,119 @@ func TestWebhook_ValidateUpdate(t *testing.T) {
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["list"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
 					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpFnResps["wasm"]),
 				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(_ *v1alpha.SchemaRegistry, _ *field.Path) (conduit.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
 
 				return testutil.SetupSampleConduit(t)
 			},
 		},
 		{
-			name: "error occurs on http call",
+			name: "validates pipeline with source processors",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
-				webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")).Times(4)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(_ *v1alpha.SchemaRegistry, _ *field.Path) (conduit.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
+
+				return testutil.SetupSourceProcConduit(t)
+			},
+		},
+		{
+			name: "error occurs on http call in connector schema validation",
+			setup: func() *v1alpha.Conduit {
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, nil).
+					Times(1)
+				registryFactory = func(_ *v1alpha.SchemaRegistry, _ *field.Path) (conduit.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
 
 				return testutil.SetupSampleConduit(t)
 			},
 			wantErr: nil,
 		},
 		{
-			name: "error occurs during validation",
+			name: "error occurs during standalone proc registration",
+			setup: func() *v1alpha.Conduit {
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["wasm"]),
+				)
+
+				mockRegistry := mock.NewMockPluginRegistry(ctrl)
+				name := plugin.NewFullName(plugin.PluginTypeStandalone, "name", "latest")
+				mockRegistry.EXPECT().
+					Register(gomock.Any(), gomock.Any()).
+					Return(name, plugin.ErrPluginAlreadyRegistered).
+					Times(1)
+				registryFactory = func(_ *v1alpha.SchemaRegistry, _ *field.Path) (conduit.PluginRegistry, *field.Error) {
+					return mockRegistry, nil
+				}
+
+				return testutil.SetupSampleConduit(t)
+			},
+		},
+		{
+			name: "error occurs for connector processor validation",
+			setup: func() *v1alpha.Conduit {
+				webClient := conduit.SetupHTTPMockClient(t)
+				httpResps := conduit.GetHTTPResps(t)
+				gomock.InOrder(
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["list"]),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+					webClient.EXPECT().Do(gomock.Any()).Return(nil, errors.New("BOOM")),
+					webClient.EXPECT().Do(gomock.Any()).DoAndReturn(httpResps["spec"]),
+				)
+
+				return testutil.SetupSourceProcConduit(t)
+			},
+			wantErr: apierrors.NewInvalid(v1alpha.GroupKind, "sample", field.ErrorList{
+				field.InternalError(
+					field.NewPath("spec", "connectors", "standalone"),
+					fmt.Errorf("failed to save wasm to file: BOOM"),
+				),
+			}),
+		},
+		{
+			name: "error occurs during connector param validation",
 			setup: func() *v1alpha.Conduit {
 				webClient := conduit.SetupHTTPMockClient(t)
 				httpFnResps := conduit.GetHTTPResps(t)
