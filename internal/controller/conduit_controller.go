@@ -394,7 +394,7 @@ func (r *ConduitReconciler) CreateOrUpdateDeployment(ctx context.Context, c *v1.
 				ObjectMeta: metav1.ObjectMeta{},
 				Spec: corev1.PodSpec{
 					RestartPolicy:  corev1.RestartPolicyAlways,
-					InitContainers: ConduitInitContainers(c.Spec.Connectors),
+					InitContainers: ConduitInitContainers(c.Spec.Connectors, c.Spec.Processors),
 					Containers: []corev1.Container{
 						container,
 					},
