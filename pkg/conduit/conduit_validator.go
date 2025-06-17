@@ -1,4 +1,5 @@
-//go:generate mockgen --build_flags=--mod=mod -source=./conduit_validator.go -destination=mock/http_client_mock.go -package=mock
+//go:generate mockgen --build_flags=--mod=mod -source=./http_client.go -destination=mock/http_client_mock.go -package=mock
+//go:generate mockgen --build_flags=--mod=mod -source=./plugin_registry.go -destination=mock/registry_mock.go -package=mock
 
 package conduit
 
@@ -8,13 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 
 	"github.com/conduitio/conduit-commons/config"
 	sdk "github.com/conduitio/conduit-connector-sdk"
 	v1alpha "github.com/conduitio/conduit-operator/api/v1alpha"
+	"github.com/conduitio/conduit/pkg/plugin"
+	"github.com/conduitio/conduit/pkg/plugin/processor/standalone"
 	pconfig "github.com/conduitio/conduit/pkg/provisioning/config"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -30,9 +35,7 @@ const (
 
 var HTTPClient httpClient = http.DefaultClient
 
-type httpClient interface {
-	Do(req *http.Request) (*http.Response, error)
-}
+var _ PluginRegistry = (*standalone.Registry)(nil)
 
 var _ ValidatorService = (*Validator)(nil)
 
@@ -93,10 +96,46 @@ func (v *Validator) ValidateConnector(ctx context.Context, c *v1alpha.ConduitCon
 	return nil
 }
 
-func (v *Validator) ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
+func (v *Validator) ValidateProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, reg PluginRegistry, fp *field.Path) *field.Error {
+	if err := v.validateProcessorPlugin(p, fp); err != nil {
+		return err
+	}
+
+	if err := v.validateStandaloneProcessor(ctx, p, reg, fp); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v *Validator) validateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error {
 	if p.Plugin == "" {
 		return field.Required(fp.Child("plugin"), "plugin cannot be empty")
 	}
+	return nil
+}
+
+func (v *Validator) validateStandaloneProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, reg PluginRegistry, fp *field.Path) *field.Error {
+	if p.ProcessorURL == "" {
+		return nil
+	}
+
+	file, cleanup, err := pluginWASM(ctx, p.ProcessorURL)
+	if err != nil {
+		return field.InternalError(fp.Child("standalone"), fmt.Errorf("failed to save wasm to file: %w", err))
+	}
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	_, err = reg.Register(ctx, file)
+	if err != nil {
+		if errors.Is(err, plugin.ErrPluginAlreadyRegistered) {
+			return nil
+		}
+		return field.InternalError(fp.Child("standalone"), fmt.Errorf("failed to register: %w", err))
+	}
+
 	return nil
 }
 
@@ -209,7 +248,7 @@ func (v *Validator) fetchYAMLSpec(ctx context.Context, c *v1alpha.ConduitConnect
 
 // formatPluginName converts the plugin name into the format
 // "conduit-connector-connectorName"
-// Returns the github organization and the transformed connector name
+// Returns the transformed connector name
 func formatPluginName(pn string) (string, error) {
 	parts := strings.Split(strings.TrimPrefix(strings.ToLower(pn), "github.com/"), "/")
 
@@ -230,6 +269,43 @@ func formatPluginName(pn string) (string, error) {
 	return "", nil
 }
 
+// pluginWASM gets the processor WASM from the specified URL and saves to a temp
+// file.
+// Returns the filename of the created file and a cleanup function fo the file
+func pluginWASM(ctx context.Context, processorURL string) (string, func(), error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, processorURL, nil)
+	if err != nil {
+		return "", nil, err
+	}
+
+	resp, err := HTTPClient.Do(req)
+	if err != nil {
+		return "", nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", nil, fmt.Errorf("non-sucessful status code while getting processor WASM, status code: %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	file, err := os.CreateTemp("", "proc-*.wasm")
+	if err != nil {
+		return "", nil, err
+	}
+	defer func() {
+		file.Close()
+	}()
+
+	if _, err = io.Copy(file, resp.Body); err != nil {
+		return "", nil, err
+	}
+
+	return file.Name(), func() {
+		if err := os.Remove(file.Name()); err != nil {
+			log.Println(err)
+		}
+	}, nil
+}
+
 // connectorList constructs a dictionary of connectors with information for
 // use by the validator. Skips any connectors with improper name formmatting or
 // are not in allowed orgs.
@@ -244,7 +320,7 @@ func connectorList(ctx context.Context) (map[string]PluginInfo, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, fmt.Errorf("getting connector list, status code: %d", resp.StatusCode)
 	}
 	defer resp.Body.Close()
 
