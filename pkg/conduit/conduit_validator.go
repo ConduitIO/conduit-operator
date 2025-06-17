@@ -278,7 +278,6 @@ func pluginWASM(ctx context.Context, processorURL string) (string, func(), error
 		return "", nil, err
 	}
 
-	fmt.Println("http - wasm")
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return "", nil, err
@@ -316,7 +315,6 @@ func connectorList(ctx context.Context) (map[string]PluginInfo, error) {
 		return nil, err
 	}
 
-	fmt.Println("http - list")
 	resp, err := HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
