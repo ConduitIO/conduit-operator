@@ -310,7 +310,7 @@ func SetupSourceProcConduit(t *testing.T) *v1alpha.Conduit {
 						{
 							ID:           "proc1",
 							Name:         "proc1",
-							Plugin:       "builtin:base64.encode",
+							Plugin:       "standalone:foo.encode",
 							Workers:      2,
 							Condition:    "{{ eq .Metadata.key \"pipeline\" }}",
 							ProcessorURL: "http://127.0.0.1:8090/api/files/processors/RECORD_ID/FILENAME",
