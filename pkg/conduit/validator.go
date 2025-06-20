@@ -9,5 +9,5 @@ import (
 
 type ValidatorService interface {
 	ValidateConnector(ctx context.Context, c *v1alpha.ConduitConnector, fp *field.Path) *field.Error
-	ValidateProcessorPlugin(p *v1alpha.ConduitProcessor, fp *field.Path) *field.Error
+	ValidateProcessor(ctx context.Context, p *v1alpha.ConduitProcessor, r PluginRegistry, fp *field.Path) *field.Error
 }
